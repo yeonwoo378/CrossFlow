@@ -123,8 +123,7 @@ def get_config():
     config.sample = d(
         sample_steps=50,
         n_samples=30000,
-        mini_batch_size=10,  # the decoder is large
-        algorithm='dpm_solver',
+        mini_batch_size=10,
         cfg=False,
         scale=7,
         path=''

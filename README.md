@@ -21,6 +21,7 @@ ______
 
 - [x] Release inference code and 512px CLIP DiMR model.
 - [ ] Release training code and a detailed training tutorial (ETA: Dec 20).
+- [ ] Release inference code for linear interpolation and arithmetic.
 - [ ] Release all pretrained checkpoints, including:   (ETA: Dec 23)
   - 256px CLIP DiMR model, 
   - 256px T5XXL DiMR model, 
@@ -29,6 +30,53 @@ ______
 - [ ] Provide a demo via Hugging Face Space and Colab.
 
 ______
+
+## Requirements
+
+The code has been tested with PyTorch 2.1.2 and Cuda 12.1.
+
+An example of installation commands is provided as follows:
+
+```
+git clone git@github.com:qihao067/CrossFlow.git
+cd CrossFlow
+
+pip3 install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+pip3 install -U --pre triton
+pip3 install -r requirements.txt
+```
+
+------
+
+## Pretrained Models
+
+| Architecture | Image Resolutions | LM     | Training Epochs         | #Params. of FM | Download                                                     |
+| :----------- | ----------------- | ------ | ----------------------- | -------------- | ------------------------------------------------------------ |
+| DiMR         | 256x256           | CLIP   |                         | 0.95B          | (TODO)                                                       |
+| DiMR         | 256x256           | T5-XXL |                         | 0.95B          | (TODO)                                                       |
+| DiMR         | 512x512           | CLIP   | 1 (LIAON 400M)+10 (JDB) | 0.98B          | [[link](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] |
+| DiMR         | 512x512           | T5-XXL |                         |                | (TODO)                                                       |
+| DiT          | 512x512           | T5-XXL |                         |                | (TODO)                                                       |
+
+------
+
+## Sampling
+
+You can sample from the pre-trained CrossFLow model with the [`demo_t2i.py`](https://github.com/qihao067/CrossFlow/blob/main/demo_t2i.py). Before running the script, download the appropriate checkpoint and configure hyperparameters such as the classifier-free guidance scale, random seed, and mini-batch size in the corresponding configuration files.
+
+To accelerate the sampling process, the script supports multi-GPU sampling. For example, to sample from the 512px CLIP DiMR-based CrossFlow model with `N` gpus, you can use the following command, which generates `N x mini-batch size` images each time:
+
+```
+accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.py \
+          --config=configs/t2i_512px_clip.py \
+          --nnet_path=path/to/t2i_512px_clip_dimr.pth \
+          --img_save_path=temp_saved_images \
+          --prompt='A dog flying in the sky' \
+```
+
+
+
+------
 
 ## Terms of use
 
