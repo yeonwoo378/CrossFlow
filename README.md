@@ -19,14 +19,14 @@ ______
 
 ## TODO
 
-- [x] Release inference code and 512px CLIP DiMR model.
+- [x] Release inference code and 512px CLIP DiMR-based model.
 - [ ] Release training code and a detailed training tutorial (ETA: Dec 20).
 - [ ] Release inference code for linear interpolation and arithmetic.
 - [ ] Release all pretrained checkpoints, including:   (ETA: Dec 23)
-  - 256px CLIP DiMR model, 
-  - 256px T5XXL DiMR model, 
-  - 512px T5XXL DiMR model, 
-  - 512px T5XXL DiT model
+  - 256px CLIP DiMR-based model, 
+  - 256px T5XXL DiMR-based model, 
+  - 512px T5XXL DiMR-based model, 
+  - 512px T5XXL DiT-based model
 - [ ] Provide a demo via Hugging Face Space and Colab.
 
 ______
@@ -50,13 +50,13 @@ pip3 install -r requirements.txt
 
 ## Pretrained Models
 
-| Architecture | Image Resolutions | LM     | Training Epochs         | #Params. of FM | Download                                                     |
-| :----------- | ----------------- | ------ | ----------------------- | -------------- | ------------------------------------------------------------ |
-| DiMR         | 256x256           | CLIP   |                         | 0.95B          | (TODO)                                                       |
-| DiMR         | 256x256           | T5-XXL |                         | 0.95B          | (TODO)                                                       |
-| DiMR         | 512x512           | CLIP   | 1 (LIAON 400M)+10 (JDB) | 0.98B          | [[link](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] |
-| DiMR         | 512x512           | T5-XXL |                         |                | (TODO)                                                       |
-| DiT          | 512x512           | T5-XXL |                         |                | (TODO)                                                       |
+| Architecture | Resolutions | LM     | Training Epochs    | #Params. (FM) | Download                                                     |
+| :----------- | ----------- | ------ | ------------------ | ------------- | ------------------------------------------------------------ |
+| DiMR         | 256x256     | CLIP   |                    | 0.95B         | (TODO)                                                       |
+| DiMR         | 256x256     | T5-XXL |                    | 0.95B         | (TODO)                                                       |
+| DiMR         | 512x512     | CLIP   | 1 (LIAON)+10 (JDB) | 0.98B         | [[link](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] |
+| DiMR         | 512x512     | T5-XXL |                    |               | (TODO)                                                       |
+| DiT          | 512x512     | T5-XXL |                    |               | (TODO)                                                       |
 
 ------
 
@@ -64,7 +64,7 @@ pip3 install -r requirements.txt
 
 You can sample from the pre-trained CrossFLow model with the [`demo_t2i.py`](https://github.com/qihao067/CrossFlow/blob/main/demo_t2i.py). Before running the script, download the appropriate checkpoint and configure hyperparameters such as the classifier-free guidance scale, random seed, and mini-batch size in the corresponding configuration files.
 
-To accelerate the sampling process, the script supports multi-GPU sampling. For example, to sample from the 512px CLIP DiMR-based CrossFlow model with `N` gpus, you can use the following command, which generates `N x mini-batch size` images each time:
+To accelerate the sampling process, the script supports multi-GPU sampling. For example, to sample from the 512px CLIP DiMR-based CrossFlow model with `N` GPUs, you can use the following command. It generates `N x mini-batch size` images each time:
 
 ```
 accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.py \
