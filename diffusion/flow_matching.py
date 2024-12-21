@@ -295,23 +295,6 @@ class FlowMatching(nn.Module):
         else:
             return err.pow(2).flatten(start_dim=start_dim).mean(dim=-1)
 
-    def contrast_loss(self, mu, pooler_output, threshold_similar = 0.5, margin = -1.0):
-        norm_pooler_output = pooler_output / pooler_output.norm(dim=1, keepdim=True)
-        pooler_output_similarity = torch.mm(norm_pooler_output, norm_pooler_output.t())
-
-        labels = pooler_output_similarity.clone()  # 1 for similar, 0 for dissimilar
-        labels[pooler_output_similarity>threshold_similar] = 1
-        labels[pooler_output_similarity<threshold_similar] = 0
-
-        labels.fill_diagonal_(0) # set results on diagonal be 0
-
-        norm_mu = mu/mu.norm(dim=1, keepdim=True)
-        mu_similarity = torch.mm(norm_mu, norm_mu.t())
-
-        loss_similar = labels * (1 - mu_similarity)
-
-        return loss_similar.sum(dim=-1) / (torch.count_nonzero(loss_similar, dim=-1) + 1e-8)
-
     
     def Xentropy(self, pred, tar, con_mask=None): 
         if con_mask is not None:
@@ -326,17 +309,15 @@ class FlowMatching(nn.Module):
     def forward(
         self,
         x,
-        x_blurred,
         nnet,
         loss_coeffs,
         cond,
         con_mask,
         nnet_style,
         training_step,
-        cond_ori=None,  # only for DirCon cfgv2.3
-        con_mask_ori=None,  # only for DirCon cfgv2.3
-        pooler_output=None, # only for contrastive loss
-        batch_img_clip=None, # only for using CLIP to train VAE
+        cond_ori=None,  # not using
+        con_mask_ori=None,  # not using
+        batch_img_clip=None, # not using
         model_config=None,
         all_config=None,
         text_token=None,
@@ -347,7 +328,6 @@ class FlowMatching(nn.Module):
         **kwargs,
     ):
         assert timesteps is None, "timesteps must be None"
-        if x_blurred is not None: assert hasattr(model_config, "two_stage_generation") or hasattr(model_config, "image_as_VAEgt_blur")
 
         timesteps = self.time_step_sampler.sample_time(x)
 
@@ -357,7 +337,7 @@ class FlowMatching(nn.Module):
             else:
                 standard_diffusion=False
             return self.p_losses_textVAE(
-                x, x_blurred, cond, con_mask, timesteps, nnet, batch_img_clip=batch_img_clip, cond_ori=cond_ori, con_mask_ori=con_mask_ori, text_token=text_token, pooler_output=pooler_output, loss_coeffs=loss_coeffs, return_raw_loss=return_raw_loss, nnet_style=nnet_style, standard_diffusion=standard_diffusion, all_config=all_config, training_step=training_step, *args, **kwargs
+                x, cond, con_mask, timesteps, nnet, batch_img_clip=batch_img_clip, cond_ori=cond_ori, con_mask_ori=con_mask_ori, text_token=text_token, loss_coeffs=loss_coeffs, return_raw_loss=return_raw_loss, nnet_style=nnet_style, standard_diffusion=standard_diffusion, all_config=all_config, training_step=training_step, *args, **kwargs
             )
         elif nnet_style == 'dit':
             if hasattr(model_config, "standard_diffusion") and model_config.standard_diffusion:
@@ -366,7 +346,7 @@ class FlowMatching(nn.Module):
             else:
                 standard_diffusion=False
             return self.p_losses_textVAE_dit(
-                    x, x_blurred, cond, con_mask, timesteps, nnet, batch_img_clip=batch_img_clip, cond_ori=cond_ori, con_mask_ori=con_mask_ori, text_token=text_token, pooler_output=pooler_output, loss_coeffs=loss_coeffs, return_raw_loss=return_raw_loss, nnet_style=nnet_style, standard_diffusion=standard_diffusion, all_config=all_config, training_step=training_step, *args, **kwargs
+                    x, cond, con_mask, timesteps, nnet, batch_img_clip=batch_img_clip, cond_ori=cond_ori, con_mask_ori=con_mask_ori, text_token=text_token, loss_coeffs=loss_coeffs, return_raw_loss=return_raw_loss, nnet_style=nnet_style, standard_diffusion=standard_diffusion, all_config=all_config, training_step=training_step, *args, **kwargs
                 )
         else:
             raise NotImplementedError
@@ -376,7 +356,6 @@ class FlowMatching(nn.Module):
     def p_losses_textVAE(
         self,
         x_start,
-        x_start_blurred,
         cond,
         con_mask,
         t,
@@ -387,9 +366,8 @@ class FlowMatching(nn.Module):
         nnet_style=None,
         all_config=None,
         batch_img_clip=None,
-        cond_ori=None, # only for DirCon cfgv2.3
-        con_mask_ori=None, # only for DirCon cfgv2.3
-        pooler_output=None, # only for contrastive loss
+        cond_ori=None, # not using
+        con_mask_ori=None, # not using
         return_raw_loss=False,
         additional_embeddings=None,
         standard_diffusion=False,
@@ -407,7 +385,7 @@ class FlowMatching(nn.Module):
         if batch_img_clip.shape[-1] == 512:
             recon_gt = self.resizer(batch_img_clip)
         else:
-            recon_gt = batch_img_clip
+            recon_gt = batch_img_clip # LQH: 直接使用 GT image
         recon_gt_clip, logit_scale = nnet(recon_gt, image_clip = True) 
         image_features = recon_gt_clip / recon_gt_clip.norm(dim=-1, keepdim=True)
         text_features = x0 / x0.norm(dim=-1, keepdim=True)
@@ -459,7 +437,6 @@ class FlowMatching(nn.Module):
     def p_losses_textVAE_dit(
         self,
         x_start,
-        x_start_blurred,
         cond,
         con_mask,
         t,
@@ -470,9 +447,8 @@ class FlowMatching(nn.Module):
         nnet_style=None,
         all_config=None,
         batch_img_clip=None,
-        cond_ori=None, # only for DirCon cfgv2.3
-        con_mask_ori=None, # only for DirCon cfgv2.3
-        pooler_output=None, # only for contrastive loss
+        cond_ori=None, # not using
+        con_mask_ori=None, # not using
         return_raw_loss=False,
         additional_embeddings=None,
         standard_diffusion=False,
@@ -540,13 +516,13 @@ class ODEEulerFlowMatchingSolver(Solver):
         sigma_min = 1e-5
         sigma_max = 1.0
         sigma_steps = torch.linspace(
-            sigma_min, sigma_max, self.num_time_steps + 1, device=self.device
+            sigma_min, sigma_max, self.num_time_steps + 1, device=x_T.device
         )
         discrete_time_steps_for_step = torch.linspace(
-            t[0], t[1], self.num_time_steps + 1, device=self.device
+            t[0], t[1], self.num_time_steps + 1, device=x_T.device
         )
         discrete_time_steps_to_eval_model_at = torch.linspace(
-            t[0], t[1], self.num_time_steps, device=self.device
+            t[0], t[1], self.num_time_steps, device=x_T.device
         )
 
         print("num_time_steps : " + str(self.num_time_steps))

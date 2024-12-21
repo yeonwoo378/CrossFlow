@@ -54,7 +54,7 @@ def main(bz = 16):
         for line in file:
             dicts_list.append(json.loads(line))
 
-    save_dir = f'train_JDBdemo'
+    save_dir = f'feature'
     device = "cuda"
     recreate_folder(save_dir)
 

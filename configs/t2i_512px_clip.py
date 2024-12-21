@@ -14,7 +14,7 @@ model = Args(
     use_t2i = True,
     clip_dim=768,
     num_clip_token=77,
-    gradient_checking=True, # for larger model
+    gradient_checking=True,
     cfg_indicator=0.15,
     textVAE = Args(
         num_blocks = 11,
@@ -116,8 +116,7 @@ def get_config():
         llm='clip',
         train_path='/data/qihao/dataset/JDB_demo_feature/',
         val_path='/data/qihao/dataset/coco_val_features/',
-        cfg=False,
-        p_uncond=0.1
+        cfg=False
     )
 
     config.sample = d(

@@ -134,10 +134,7 @@ def evaluate(config):
             else:
                 _cfg = config.sample.scale
 
-            if hasattr(config.nnet.model_args, "cfg_indicator"):
-                has_null_indicator = True
-            else:
-                has_null_indicator = False
+            has_null_indicator = hasattr(config.nnet.model_args, "cfg_indicator")
             
             _sample_steps = config.sample.sample_steps
             

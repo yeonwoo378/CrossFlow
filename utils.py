@@ -157,10 +157,6 @@ class TrainState(object):
                 val.to(device)
 
 
-def cnt_params(model):
-    return sum(param.numel() for param in model.parameters())
-
-
 def trainable_parameters(nnet):
     params_decay = []
     params_nodecay = []
@@ -183,7 +179,6 @@ def initialize_train_state(config, device):
     nnet = get_nnet(**config.nnet)
     nnet_ema = get_nnet(**config.nnet)
     nnet_ema.eval()
-    logging.info(f'nnet has {cnt_params(nnet)} parameters')
 
     optimizer = get_optimizer(trainable_parameters(nnet), **config.optimizer)
     lr_scheduler = get_lr_scheduler(optimizer, **config.lr_scheduler)

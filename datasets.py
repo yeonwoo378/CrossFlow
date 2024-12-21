@@ -202,7 +202,8 @@ class JDBFeatureDataset(Dataset):
         img = (img / 127.5 - 1.0).astype(np.float32)
         img = einops.rearrange(img, 'h w c -> c h w')
 
-        return z, token_embedding, token_mask, token, caption, 0, img, 0, 0
+        # return z, token_embedding, token_mask, token, caption, 0, img, 0, 0
+        return z, token_embedding, token_mask, token, caption, img
 
 
 class JDBFullFeatures(DatasetFactory):  # the moments calculated by Stable Diffusion image encoder & the contexts calculated by clip
