@@ -19,8 +19,8 @@ ______
 
 ## TODO
 
-- [x] Release inference code and 512px CLIP DiMR-based model.
-- [x] Release training code and a detailed training tutorial (ETA: Dec 20).
+- [x] ~~Release inference code and 512px CLIP DiMR-based model.~~
+- [x] ~~Release training code and a detailed training tutorial (ETA: Dec 20).~~
 - [ ] Release inference code for linear interpolation and arithmetic.
 - [ ] Release all pretrained checkpoints, including:   (ETA: Dec 23)
   - 256px CLIP DiMR-based model, 
@@ -92,7 +92,7 @@ accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.
 
   To accelerate the training process, you can cache the image latents (from a VAE) and text embeddings (from a language model such as CLIP or T5-XXL) beforehand. We offer preprocessing scripts to simplify this step. 
 
-  Specifically, you can use the [`scripts/extract_train_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_train_feature.py) script to extract and save these features. Before running the script, ensure that you update the dataset paths (`json_path` and `root_path`) and set an appropriate batch size (`bz`) . Once the features are generated, move them to the dataset directory. The training dataset should then have the following structure. Additionally, remember to update the training dataset path in the configuration file.
+  Specifically, you can use the [`scripts/extract_train_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_train_feature.py) script to extract and save these features. Before running the script, ensure that you update the dataset paths (`json_path` and `root_path`) and set an appropriate batch size (`bz`) . Once the features are generated, move them to the dataset directory. The training dataset should then have the following structure. Additionally, remember to update the training dataset path in the [configuration file](https://github.com/qihao067/CrossFlow/blob/main/configs/t2i_training_demo.py#L118).
 
   ```
   training_dataset   
@@ -105,7 +105,7 @@ accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.
           └── ...
   ```
 
-  Similarly, we cache the latents and embeddings for the test set (e.g., MSCOCO) and the prompts used for visualization during the validation step of the training process. This can be achieved by running the following scripts [`scripts/extract_mscoco_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_mscoco_feature.py), [`scripts/extract_empty_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_empty_feature.py), and [`scripts/extract_test_prompt_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_test_prompt_feature.py). Before running these scripts, ensure you have downloaded the MSCOCO validation set. Then, update the dataset paths and specify the language model in each script. Once the features are generated, organize them into the following file structure in the validation dataset directory. Additionally, make sure to update the validation path in the configuration file.
+  Similarly, we cache the latents and embeddings for the test set (e.g., MSCOCO) and the prompts used for visualization during the validation step of the training process. This can be achieved by running the following scripts [`scripts/extract_mscoco_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_mscoco_feature.py), [`scripts/extract_empty_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_empty_feature.py), and [`scripts/extract_test_prompt_feature.py`](https://github.com/qihao067/CrossFlow/blob/main/scripts/extract_test_prompt_feature.py). Before running these scripts, ensure you have downloaded the MSCOCO validation set. Then, update the dataset paths and specify the language model in each script. Once the features are generated, organize them into the following file structure in the validation dataset directory. Additionally, make sure to update the validation path in the [configuration file](https://github.com/qihao067/CrossFlow/blob/main/configs/t2i_training_demo.py#L119).
 
   ```
   val_dataset   
@@ -123,7 +123,7 @@ accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.
   We provide a training script for text-to-image (T2I) generation in [`train_t2i.py`](https://github.com/qihao067/CrossFlow/blob/main/train_t2i.py). Additionally, a demo configuration file is available at [`t2i_training_demo.py`](https://github.com/qihao067/CrossFlow/blob/main/configs/t2i_training_demo.py). Before starting the training, adjust the settings in the configuration file as indicated by the comments. Once configured, you can launch the training process using `N` GPUs on a single node:
 
   ```
-  accelerate launch --multi_gpu --num_processes 8 --num_machines 1 --mixed_precision bf16 train_t2i_discrete.py \
+  accelerate launch --multi_gpu --num_processes N --num_machines 1 --mixed_precision bf16 train_t2i_discrete.py \
               --config=configs/t2i_training_demo.py
   ```
 
@@ -142,8 +142,8 @@ ______
 This codebase is built upon the following repository:
 
 - [[U-ViT](https://github.com/baofff/U-ViT)]
-- [[DiMR](https://github.com/qihao067/DiMR)]
 - [[DiT](https://github.com/facebookresearch/DiT)]
+- [[DiMR](https://github.com/qihao067/DiMR)]
 - [[DeepFloyd](https://github.com/deep-floyd/IF)]
 
 Much appreciation for their outstanding efforts.
