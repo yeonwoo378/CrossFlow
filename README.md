@@ -126,9 +126,9 @@ ______
 
   <p align="center">
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/0.png" alt="Figure 1" width="200"/>
-    <span>+</span>
+    <span style="font-size: 30px; vertical-align: middle;">+</span>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/1.png" alt="Figure 2" width="200"/>
-    <span>-</span>
+    <span style="font-size: 30px; vertical-align: middle;">-</span>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/2.png" alt="Figure 3" width="200"/>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/3.png" alt="Figure 4" width="200"/>
   </p>
