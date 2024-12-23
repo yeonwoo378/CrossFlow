@@ -230,7 +230,7 @@ def sample2dir_wCLIP(accelerator, path, n_samples, mini_batch_size, sample_fn, u
     if return_clipScore:
         assert ClipSocre_model is not None
 
-    for _batch_size in tqdm(amortize(n_samples, batch_size), disable=not accelerator.is_main_process, desc='sample2dir'):
+    for _batch_size in amortize(n_samples, batch_size):
         samples, clip_score = sample_fn(mini_batch_size, return_clipScore=return_clipScore, ClipSocre_model=ClipSocre_model, config=config)
         samples = unpreprocess_fn(samples)
         samples = accelerator.gather(samples.contiguous())[:_batch_size]

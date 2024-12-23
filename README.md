@@ -21,7 +21,7 @@ ______
 
 - [x] ~~Release inference code and 512px CLIP DiMR-based model.~~
 - [x] ~~Release training code and a detailed training tutorial (ETA: Dec 20).~~
-- [ ] Release inference code for linear interpolation and arithmetic.
+- [x] ~~Release inference code for linear interpolation and arithmetic.~~
 - [ ] Release all pretrained checkpoints, including:   (ETA: Dec 23)
   - 256px CLIP DiMR-based model, 
   - 256px T5XXL DiMR-based model, 
@@ -68,19 +68,70 @@ ______
 
 ## Sampling
 
-You can sample from the pre-trained CrossFLow model with the [`demo_t2i.py`](https://github.com/qihao067/CrossFlow/blob/main/demo_t2i.py). Before running the script, download the appropriate checkpoint and configure hyperparameters such as the classifier-free guidance scale, random seed, and mini-batch size in the corresponding configuration files.
+- ### T2I generation:
 
-To accelerate the sampling process, the script supports multi-GPU sampling. For example, to sample from the 512px CLIP DiMR-based CrossFlow model with `N` GPUs, you can use the following command. It generates `N x mini-batch size` images each time:
+  You can sample from the pre-trained CrossFLow model with the [`demo_t2i.py`](https://github.com/qihao067/CrossFlow/blob/main/demo_t2i.py). Before running the script, download the appropriate checkpoint and configure hyperparameters such as the classifier-free guidance scale, random seed, and mini-batch size in the corresponding configuration files.
 
-```
-# accelerate launch --num_processes 1 --mixed_precision bf16 demo_t2i.py \ # if only sample with one GPU
+  To accelerate the sampling process, the script supports multi-GPU sampling. For example, to sample from the 512px CLIP DiMR-based CrossFlow model with `N` GPUs, you can use the following command. It generates `N x mini-batch size` images each time:
 
-accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.py \
-          --config=configs/t2i_512px_clip.py \
-          --nnet_path=path/to/t2i_512px_clip_dimr.pth \
-          --img_save_path=temp_saved_images \
-          --prompt='your prompt' \
-```
+  ```
+  # if only sample with one GPU:
+  # accelerate launch --num_processes 1 --mixed_precision bf16 demo_t2i.py \
+  
+  accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.py \
+            --config=configs/t2i_512px_clip.py \
+            --nnet_path=path/to/t2i_512px_clip_dimr.pth \
+            --img_save_path=temp_saved_images \
+            --prompt='your prompt' \
+  ```
+
+- ### Linear Interpolation in Latent Space
+
+  Our model provides visually smooth interpolations in the latent space. By using the [`demo_t2i_arith.py`](https://github.com/qihao067/CrossFlow/blob/main/demo_t2i_arith.py) script, images can be generated through linear interpolation between two input prompts using the following command:
+
+  ```
+  accelerate launch --num_processes 1 --mixed_precision bf16 demo_t2i_arith.py \
+            --config=configs/t2i_512px_clip.py \
+            --nnet_path=path/to/t2i_512px_clip_dimr.pth \
+            --img_save_path=temp_saved_images \
+            --test_type=interpolation \
+            --prompt_1='A dog cooking dinner in the kitchen' \
+            --prompt_2='An orange cat wearing sunglasses on a ship' \
+            --num_of_interpolation=40 \
+            --save_gpu_memory \
+  
+  ```
+
+  This script supports sampling on a single GPU only. For linear interpolation, you need to adjust the `num_of_interpolation` parameter, which controls the number of interpolated images generated. The script requires a minimum of `5` images, but we recommend setting it to `40` for smoother interpolations. Additionally, you can enable the `save_gpu_memory` option to optimize GPU VRAM usage, though this will require extra time.
+
+  Finally, the command will generate `num_of_interpolation` images in the specified `img_save_path`. Using the provided random seed (`1234`), the resulting images will appear as follows
+  ![teaser](https://github.com/qihao067/CrossFlow/blob/main/imgs/linear_output.gif)
+
+- ### Arithmetic Operations in Latent Space
+
+  Our model supports arithmetic operations in the text latent space. Using the Text Variational Encoder, we first encode the input text into the latent space. Arithmetic operations are then applied within this latent space, and the resulting latent representation is utilized to generate the corresponding image. An example can be demonstrated using the following command:
+
+  ```
+  accelerate launch --num_processes 1 --mixed_precision bf16 demo_t2i_arith.py \
+            --config=configs/t2i_512px_clip.py \
+            --nnet_path=path/to/t2i_512px_clip_dimr.pth \
+            --img_save_path=temp_saved_images \
+            --test_type=arithmetic \
+            --prompt_ori='A corgi wearing a red hat in the park' \
+            --prompt_a='book' \
+            --prompt_s='hat' \
+  ```
+
+  The images generated in the folder `img_save_path` include three images of the input prompt, along with the resulting image after the arithmetic operations (`prompt_ori + prompt_a - prompt_s` ) .
+
+  <p align="center">
+    <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/0.png" alt="Figure 1" width="200"/>
+    <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/1.png" alt="Figure 2" width="200"/>
+    <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/2.png" alt="Figure 3" width="200"/>
+    <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/3.png" alt="Figure 4" width="200"/>
+  </p>
+
+  We also support single arithmetic operations. You can perform addition by providing only `prompt_ori` and `prompt_a`, or subtraction by providing only `prompt_ori` and `prompt_s`.
 
 ------
 
