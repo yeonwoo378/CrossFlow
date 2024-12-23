@@ -124,11 +124,11 @@ ______
 
   The images generated in the folder `img_save_path` include three images of the input prompt, along with the resulting image after the arithmetic operations (`prompt_ori + prompt_a - prompt_s` ) .
 
-  <p align="center">
+  <p align="center" style="display: flex; align-items: center;">
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/0.png" alt="Figure 1" width="200"/>
-    <span style="font-size: 30px; vertical-align: middle;">+</span>
+    <span style="font-size: 30px;">+</span>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/1.png" alt="Figure 2" width="200"/>
-    <span style="font-size: 30px; vertical-align: middle;">-</span>
+    <span style="font-size: 30px;">-</span>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/2.png" alt="Figure 3" width="200"/>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/3.png" alt="Figure 4" width="200"/>
   </p>
