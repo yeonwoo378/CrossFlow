@@ -385,7 +385,7 @@ class FlowMatching(nn.Module):
         if batch_img_clip.shape[-1] == 512:
             recon_gt = self.resizer(batch_img_clip)
         else:
-            recon_gt = batch_img_clip # LQH: 直接使用 GT image
+            recon_gt = batch_img_clip
         recon_gt_clip, logit_scale = nnet(recon_gt, image_clip = True) 
         image_features = recon_gt_clip / recon_gt_clip.norm(dim=-1, keepdim=True)
         text_features = x0 / x0.norm(dim=-1, keepdim=True)
@@ -458,8 +458,55 @@ class FlowMatching(nn.Module):
         CrossFLow training for DiT
         """
 
-        raise NotImplementedError("will update")
-    
+        assert noise is None
+
+        x0, mu, log_var = nnet(cond, text_encoder = True, shape = x_start.shape, mask = con_mask)
+
+        ############ loss for Text VE
+        if batch_img_clip.shape[-1] == 512:
+            recon_gt = self.resizer(batch_img_clip)
+        else:
+            recon_gt = batch_img_clip
+        recon_gt_clip, logit_scale = nnet(recon_gt, image_clip = True)
+        image_features = recon_gt_clip / recon_gt_clip.norm(dim=-1, keepdim=True)
+        text_features = x0 / x0.norm(dim=-1, keepdim=True)
+        recons_loss = self.clip_loss(image_features, text_features, logit_scale)
+
+        # kld_loss = -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1)
+        kld_loss = -0.5 * torch.sum(1 + log_var - (0.3 * mu) ** 6 - log_var.exp(), dim = 1)
+        kld_loss_weight = 1e-2 # 0.0005
+
+        loss_mlp = recons_loss + kld_loss * kld_loss_weight
+        
+        ############ loss for FM
+        noise = x0.reshape(x_start.shape)
+
+        if hasattr(all_config.nnet.model_args, "cfg_indicator"):
+            null_indicator = torch.from_numpy(np.array([random.random() < all_config.nnet.model_args.cfg_indicator for _ in range(x_start.shape[0])])).to(x_start.device)
+            if null_indicator.sum()<=1:
+                null_indicator[null_indicator==True] = False
+                assert null_indicator.sum() == 0
+                pass
+            else:
+                target_null = x_start[null_indicator]
+                target_null = torch.cat((target_null[1:], target_null[:1]))
+                x_start[null_indicator] = target_null
+        else:
+            null_indicator = None
+        
+        x_noisy = self.psi(t, x=noise, x1=x_start)
+        target_velocity = self.Dt_psi(t, x=noise, x1=x_start)
+
+        prediction = nnet(x_noisy, t = t, null_indicator = null_indicator)[0]
+
+        loss_diff = self.mos(prediction - target_velocity)
+
+        ###########
+
+        loss = loss_diff + loss_mlp
+
+        return loss, {'loss_diff': loss_diff, 'clip_loss': recons_loss, 'kld_loss': kld_loss, 'kld_loss_weight': torch.tensor(kld_loss_weight, device=kld_loss.device), 'clip_logit_scale': logit_scale}
+        
 
     ## flow matching specific functions
     def psi(self, t, x, x1):

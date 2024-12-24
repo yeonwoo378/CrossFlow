@@ -22,12 +22,9 @@ ______
 - [x] ~~Release inference code and 512px CLIP DiMR-based model.~~
 - [x] ~~Release training code and a detailed training tutorial (ETA: Dec 20).~~
 - [x] ~~Release inference code for linear interpolation and arithmetic.~~
-- [ ] Release all pretrained checkpoints, including:   (ETA: Dec 23)
-  - 256px CLIP DiMR-based model, 
-  - 256px T5XXL DiMR-based model, 
-  - 512px T5XXL DiMR-based model, 
-  - 512px T5XXL DiT-based model
+- [x] ~~Release all pretrained checkpoints, including:   (ETA: Dec 23)~~
 - [ ] Provide a demo via Hugging Face Space and Colab.
+- [ ] Update pretrained checkpoints with better  (ETA: Dec 28)
 
 ______
 
@@ -56,13 +53,15 @@ ______
 
 ## Pretrained Models
 
-| Architecture | Resolutions | LM     | Training Epochs    | #Params. (FM) | Download                                                     |
-| :----------- | ----------- | ------ | ------------------ | ------------- | ------------------------------------------------------------ |
-| DiMR         | 256x256     | CLIP   |                    | 0.95B         | (TODO)                                                       |
-| DiMR         | 256x256     | T5-XXL |                    | 0.95B         | (TODO)                                                       |
-| DiMR         | 512x512     | CLIP   | 1 (LIAON)+10 (JDB) | 0.98B         | [[link](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] |
-| DiMR         | 512x512     | T5-XXL |                    |               | (TODO)                                                       |
-| DiT          | 512x512     | T5-XXL |                    |               | (TODO)                                                       |
+| Architecture | Resolutions | LM     | Download                                                     | Details                                                      |
+| :----------- | ----------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| DiMR         | 256x256     | CLIP   | [[t2i_256px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_256px_clip_dimr.pth)] | Train from scratch on LIAON-400M for 1 epoch,  then fine-tune on JourneyDB for 10 epochs. |
+| DiMR         | 256x256     | T5-XXL | [[t2i_256px_t5_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_256px_t5_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
+| DiMR         | 512x512     | CLIP   | [[t2i_512px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
+| DiMR         | 512x512     | T5-XXL | [[t2i_512px_t5_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dimr.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
+| DiT          | 512x512     | T5-XXL | [[t2i_512px_t5_dit.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dit.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
+
+- To save training time, all T5-XXL-based models are initialized with a CLIP-based model and fine-tuned on JourneyDB (4M) for ten epochs. As a result, these models may occasionally exhibit very minor text-image misalignments, which are not observed in the original paper's model trained from scratch.
 
 ------
 
@@ -79,7 +78,7 @@ ______
   # accelerate launch --num_processes 1 --mixed_precision bf16 demo_t2i.py \
   
   accelerate launch --multi_gpu --num_processes N --mixed_precision bf16 demo_t2i.py \
-            --config=configs/t2i_512px_clip.py \
+            --config=configs/t2i_512px_clip_dimr.py \
             --nnet_path=path/to/t2i_512px_clip_dimr.pth \
             --img_save_path=temp_saved_images \
             --prompt='your prompt' \
@@ -91,7 +90,7 @@ ______
 
   ```
   accelerate launch --num_processes 1 --mixed_precision bf16 demo_t2i_arith.py \
-            --config=configs/t2i_512px_clip.py \
+            --config=configs/t2i_512px_clip_dimr.py \
             --nnet_path=path/to/t2i_512px_clip_dimr.pth \
             --img_save_path=temp_saved_images \
             --test_type=interpolation \
@@ -105,6 +104,7 @@ ______
   This script supports sampling on a single GPU only. For linear interpolation, you need to adjust the `num_of_interpolation` parameter, which controls the number of interpolated images generated. The script requires a minimum of `5` images, but we recommend setting it to `40` for smoother interpolations. Additionally, you can enable the `save_gpu_memory` option to optimize GPU VRAM usage, though this will require extra time.
 
   Finally, the command will generate `num_of_interpolation` images in the specified `img_save_path`. Using the provided random seed (`1234`), the resulting images will appear as follows
+
   ![teaser](https://github.com/qihao067/CrossFlow/blob/main/imgs/linear_output.gif)
 
 - ### Arithmetic Operations in Latent Space
@@ -113,7 +113,7 @@ ______
 
   ```
   accelerate launch --num_processes 1 --mixed_precision bf16 demo_t2i_arith.py \
-            --config=configs/t2i_512px_clip.py \
+            --config=configs/t2i_512px_clip_dimr.py \
             --nnet_path=path/to/t2i_512px_clip_dimr.pth \
             --img_save_path=temp_saved_images \
             --test_type=arithmetic \
@@ -122,18 +122,17 @@ ______
             --prompt_s='hat' \
   ```
 
-  The images generated in the folder `img_save_path` include three images of the input prompt, along with the resulting image after the arithmetic operations (`prompt_ori + prompt_a - prompt_s` ) .
+  The images generated in the folder `img_save_path` include images of the the input prompts, followed by the resulting image after the arithmetic operations (`prompt_ori + prompt_a - prompt_s` ) .
 
   <p align="center" style="display: flex; align-items: center;">
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/0.png" alt="Figure 1" width="200"/>
-    <span style="font-size: 30px;">+</span>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/1.png" alt="Figure 2" width="200"/>
-    <span style="font-size: 30px;">-</span>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/2.png" alt="Figure 3" width="200"/>
     <img src="https://github.com/qihao067/CrossFlow/blob/main/imgs/3.png" alt="Figure 4" width="200"/>
   </p>
-
-  We also support single arithmetic operations. You can perform addition by providing only `prompt_ori` and `prompt_a`, or subtraction by providing only `prompt_ori` and `prompt_s`.
+  
+  
+We also support single arithmetic operation. You can perform addition by providing only `prompt_ori` and `prompt_a`, or subtraction by providing only `prompt_ori` and `prompt_s`.
 
 ------
 
