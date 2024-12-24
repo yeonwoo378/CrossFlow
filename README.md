@@ -57,11 +57,11 @@ ______
 | :----------- | ----------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | DiMR         | 256x256     | CLIP   | [[t2i_256px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_256px_clip_dimr.pth)] | Train from scratch on LIAON-400M for 1 epoch,  then fine-tune on JourneyDB for 10 epochs. |
 | DiMR         | 256x256     | T5-XXL | [[t2i_256px_t5_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_256px_t5_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
-| DiMR         | 512x512     | CLIP   | [[t2i_512px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. (Most with best alignment*) |
+| DiMR         | 512x512     | CLIP   | [[t2i_512px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. (Model with the best T-I alignment*) |
 | DiMR         | 512x512     | T5-XXL | [[t2i_512px_t5_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dimr.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
 | DiT          | 512x512     | T5-XXL | [[t2i_512px_t5_dit.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dit.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
 
-* To save training time, all T5-XXL-based models are initialized with a CLIP-based model and fine-tuned on JourneyDB (4M) for ten epochs. As a result, these models may occasionally exhibit very minor text-image misalignments, which are not observed in the original paper's T5 models since they are trained from scratch.
+*To save training time, all T5-XXL-based models are initialized with a CLIP-based model and fine-tuned on JourneyDB (4M) for ten epochs. As a result, these models may occasionally exhibit very minor text-image misalignments, which are not observed in the original paper's T5 models since they are trained from scratch.
 
 ------
 
