@@ -12,8 +12,8 @@ This is a PyTorch-based reimplementation of CrossFlow, as proposed in
 This repository provides a **PyTorch-based reimplementation** of CrossFlow for the text-to-image generation task, with the following differences compared to the original paper:
 
 - **Model Architecture**: The original paper utilizes DiMR as the model architecture. In contrast, this codebase supports training and inference with both [DiT](https://github.com/facebookresearch/DiT) (ICCV 2023, a widely adopted architecture) and [DiMR](https://github.com/qihao067/DiMR) (NeurIPS 2024, a state-of-the-art architecture).
-- **Dataset**: The original model was trained on proprietary 350M dataset. In this implementation, the models are trained on open-source datasets, including [LAION-400M](https://laion.ai/blog/laion-400-open-dataset/) and [JourneyDB](https://journeydb.github.io/).
-- **LLMs**: The original model only supports CLIP as the language model, whereas this implementation includes models with CLIP and T5-XXL.
+- **Dataset**: The original model was trained on proprietary 350M dataset. In this implementation, the models are trained on open-source datasets, including [LAION-400M](https://laion.ai/blog/laion-400-open-dataset/) and [JourneyDB](https://journeydb.github.io/) (4M).
+- **LLMs**: The original 1B model only supports CLIP as the language model, whereas this implementation includes 1B models with CLIP and T5-XXL.
 
 ______
 
@@ -61,7 +61,7 @@ ______
 | DiMR         | 512x512     | T5-XXL | [[t2i_512px_t5_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dimr.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
 | DiT          | 512x512     | T5-XXL | [[t2i_512px_t5_dit.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dit.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
 
-- To save training time, all T5-XXL-based models are initialized with a CLIP-based model and fine-tuned on JourneyDB (4M) for ten epochs. As a result, these models may occasionally exhibit very minor text-image misalignments, which are not observed in the original paper's model trained from scratch.
+- To save training time, all T5-XXL-based models are initialized with a CLIP-based model and fine-tuned on JourneyDB (4M) for ten epochs. As a result, these models may occasionally exhibit very minor text-image misalignments, which are not observed in the original paper's T5 models since they are trained from scratch.
 
 ------
 
