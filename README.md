@@ -24,7 +24,7 @@ ______
 - [x] ~~Release inference code for linear interpolation and arithmetic.~~
 - [x] ~~Release all pretrained checkpoints, including:   (ETA: Dec 23)~~
 - [ ] Provide a demo via Hugging Face Space and Colab.
-- [ ] Update pretrained checkpoints with better  (ETA: Dec 28)
+- [ ] Update pretrained checkpoints  (ETA: Dec 28)
 
 ______
 
@@ -57,7 +57,7 @@ ______
 | :----------- | ---------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | DiMR         | 256x256    | CLIP   | [[t2i_256px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_256px_clip_dimr.pth)] | Train from scratch on LIAON-400M for 1 epoch,  then fine-tune on JourneyDB for 10 epochs. |
 | DiMR         | 256x256    | T5-XXL | [[t2i_256px_t5_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_256px_t5_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
-| DiMR         | 512x512    | CLIP   | [[t2i_512px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. (Model with the best alignment*) |
+| DiMR         | 512x512    | CLIP   | [[t2i_512px_clip_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_clip_dimr.pth)] | Initialize with [t2i_256px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. (Model with the best T-I alignment*) |
 | DiMR         | 512x512    | T5-XXL | [[t2i_512px_t5_dimr.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dimr.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
 | DiT          | 512x512    | T5-XXL | [[t2i_512px_t5_dit.pth](https://huggingface.co/QHL067/CrossFlow/blob/main/pretrained_models/t2i_512px_t5_dit.pth)] | Initialize with [t2i_512px_clip_dimr.pth] and fine-tune on JourneyDB for 10 epochs. |
 
