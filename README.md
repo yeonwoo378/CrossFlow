@@ -23,8 +23,8 @@ ______
 - [x] ~~Release training code and a detailed training tutorial (ETA: Dec 20).~~
 - [x] ~~Release inference code for linear interpolation and arithmetic.~~
 - [x] ~~Release all pretrained checkpoints, including:   (ETA: Dec 23)~~
+- [x] ~~Update pretrained checkpoints  (ETA: Dec 28)~~
 - [ ] Provide a demo via Hugging Face Space and Colab.
-- [ ] Update pretrained checkpoints  (ETA: Dec 28)
 
 ______
 
@@ -132,6 +132,7 @@ ______
   </p>
   
   
+
 We also support single arithmetic operation. You can perform addition by providing only `prompt_ori` and `prompt_a`, or subtraction by providing only `prompt_ori` and `prompt_s`.
 
 ------
