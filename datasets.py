@@ -116,6 +116,58 @@ def center_crop_arr(pil_image, image_size):
     return arr[crop_y : crop_y + image_size, crop_x : crop_x + image_size]
 
 
+# MS COCO
+
+
+def center_crop(width, height, img):
+    resample = {'box': Image.BOX, 'lanczos': Image.LANCZOS}['lanczos']
+    crop = np.min(img.shape[:2])
+    img = img[(img.shape[0] - crop) // 2: (img.shape[0] + crop) // 2,
+          (img.shape[1] - crop) // 2: (img.shape[1] + crop) // 2]
+    try:
+        img = Image.fromarray(img, 'RGB')
+    except:
+        img = Image.fromarray(img)
+    img = img.resize((width, height), resample)
+
+    return np.array(img).astype(np.uint8)
+
+
+class MSCOCODatabase(Dataset):
+    def __init__(self, root, annFile, size=None):
+        from pycocotools.coco import COCO
+        self.root = root
+        self.height = self.width = size
+
+        self.coco = COCO(annFile)
+        self.keys = list(sorted(self.coco.imgs.keys()))
+
+    def _load_image(self, key: int):
+        path = self.coco.loadImgs(key)[0]["file_name"]
+        return Image.open(os.path.join(self.root, path)).convert("RGB")
+
+    def _load_target(self, key: int):
+        return self.coco.loadAnns(self.coco.getAnnIds(key))
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, index):
+        key = self.keys[index]
+        image = self._load_image(key)
+        image = np.array(image).astype(np.uint8)
+        image = center_crop(self.width, self.height, image).astype(np.float32)
+        image = (image / 127.5 - 1.0).astype(np.float32)
+        image = einops.rearrange(image, 'h w c -> c h w')
+
+        anns = self._load_target(key)
+        target = []
+        for ann in anns:
+            target.append(ann['caption'])
+
+        return image, target
+
+
 def get_feature_dir_info(root):
     files = glob.glob(os.path.join(root, '*.npy'))
     files_caption = glob.glob(os.path.join(root, '*_*.npy'))
