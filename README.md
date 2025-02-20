@@ -5,7 +5,7 @@ This is a PyTorch-based reimplementation of CrossFlow, as proposed in
 >
 >  [Qihao Liu](https://qihao067.github.io/) | [Xi Yin](https://xiyinmsu.github.io/) | [Alan Yuille](https://cogsci.jhu.edu/directory/alan-yuille/) | [Andrew Brown](https://www.robots.ox.ac.uk/~abrown/) | [Mannat Singh](https://ai.meta.com/people/1287460658859448/mannat-singh/)
 >
->  [[project page](https://cross-flow.github.io/)] | [[paper](https://arxiv.org/pdf/2412.15213)] | [[arxiv](https://arxiv.org/abs/2412.15213)]
+>  [[project page](https://cross-flow.github.io/)] | [[Demo]](https://huggingface.co/spaces/QHL067/CrossFlow)] | [[paper](https://arxiv.org/pdf/2412.15213)] | [[arxiv](https://arxiv.org/abs/2412.15213)]
 
 ![teaser](https://github.com/qihao067/CrossFlow/blob/main/imgs/teaser.jpg)
 
@@ -24,7 +24,7 @@ ______
 - [x] ~~Release inference code for linear interpolation and arithmetic.~~
 - [x] ~~Release all pretrained checkpoints, including:   (ETA: Dec 23)~~
 - [x] ~~Update pretrained checkpoints  (ETA: Dec 28)~~
-- [ ] Provide a demo via Hugging Face Space and Colab.
+- [x] ~~Provide a demo via Hugging Face Space and Colab.~~
 
 ______
 
