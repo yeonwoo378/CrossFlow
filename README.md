@@ -3,6 +3,8 @@ This is a PyTorch-based reimplementation of CrossFlow, as proposed in
 
 >  Flowing from Words to Pixels: A Framework for Cross-Modality Evolution
 >
+>  CVPR 2025
+>
 >  [Qihao Liu](https://qihao067.github.io/) | [Xi Yin](https://xiyinmsu.github.io/) | [Alan Yuille](https://cogsci.jhu.edu/directory/alan-yuille/) | [Andrew Brown](https://www.robots.ox.ac.uk/~abrown/) | [Mannat Singh](https://ai.meta.com/people/1287460658859448/mannat-singh/)
 >
 >  [[project page](https://cross-flow.github.io/)] | [[huggingface demo](https://huggingface.co/spaces/QHL067/CrossFlow)] | [[paper](https://arxiv.org/pdf/2412.15213)] | [[arxiv](https://arxiv.org/abs/2412.15213)]
