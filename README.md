@@ -1,9 +1,9 @@
 # CrossFlow
 This is a PyTorch-based reimplementation of CrossFlow, as proposed in 
 
->  Flowing from Words to Pixels: A Framework for Cross-Modality Evolution
+>  Flowing from Words to Pixels: A Noise-Free Framework for Cross-Modality Evolution
 >
->  CVPR 2025
+>  CVPR 2025 Highlight
 >
 >  [Qihao Liu](https://qihao067.github.io/) | [Xi Yin](https://xiyinmsu.github.io/) | [Alan Yuille](https://cogsci.jhu.edu/directory/alan-yuille/) | [Andrew Brown](https://www.robots.ox.ac.uk/~abrown/) | [Mannat Singh](https://ai.meta.com/people/1287460658859448/mannat-singh/)
 >
@@ -210,11 +210,12 @@ ______
 If you use our work in your research, please use the following BibTeX entry.
 
 ```
-@article{liu2024flowing,
-  title={Flowing from Words to Pixels: A Framework for Cross-Modality Evolution},
+@inproceedings{liu2025flowing,
+  title={Flowing from Words to Pixels: A Noise-Free Framework for Cross-Modality Evolution},
   author={Liu, Qihao and Yin, Xi and Yuille, Alan and Brown, Andrew and Singh, Mannat},
-  journal={arXiv preprint arXiv:2412.15213},
-  year={2024}
+  booktitle={Proceedings of the Computer Vision and Pattern Recognition Conference},
+  pages={2755--2765},
+  year={2025}
 }
 ```
 
