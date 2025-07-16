@@ -46,8 +46,8 @@ def center_crop_arr(pil_image, image_size):
 
 def main(bz = 16):
 
-    json_path = '/path/to/JourneyDB_demo/img_text_pair.jsonl'
-    root_path = '/path/to/JourneyDB_demo/imgs'
+    json_path = 'JourneyDB_demo/img_text_pair.jsonl'
+    root_path = 'JourneyDB_demo/imgs'
 
     dicts_list = []
     with open(json_path, 'r', encoding='utf-8') as file:
@@ -58,7 +58,7 @@ def main(bz = 16):
     device = "cuda"
     recreate_folder(save_dir)
 
-    autoencoder = libs.autoencoder.get_model('../assets/stable-diffusion/autoencoder_kl.pth')
+    autoencoder = libs.autoencoder.get_model('./assets/stable-diffusion/autoencoder_kl.pth')
     autoencoder.to(device)
 
     # CLIP model:
@@ -67,7 +67,7 @@ def main(bz = 16):
     clip.to(device)
 
     # T5 model:
-    t5 = T5Embedder(device=device)
+    # t5 = T5Embedder(device=device)
 
     idx = 0
     batch_img_256 = []
@@ -76,15 +76,15 @@ def main(bz = 16):
     batch_name = []
     for i, sample in enumerate(tqdm(dicts_list)):
         try:
-            pil_image = Image.open(os.path.join(root_path,sample['img_path']))
+            pil_image = Image.open(os.path.join(root_path,sample['img']))
             caption = sample['prompt']
-            img_name = sample['img_path'].replace('.jpg','')
+            img_name = sample['img'].replace('.jpg','')
             
             pil_image.load()
             pil_image = pil_image.convert("RGB")
         except:
             with open("failed_file.txt", 'a+') as file: 
-                file.write(sample['img_path'] + "\n")
+                file.write(sample['img'] + "\n")
             continue
 
         image_256 = center_crop_arr(pil_image, image_size=256)
@@ -120,27 +120,27 @@ def main(bz = 16):
             token_mask_clip = latent_and_others_clip['token_mask'].detach().cpu().numpy()
             token_clip = latent_and_others_clip['tokens'].detach().cpu().numpy()
 
-            _latent_t5, latent_and_others_t5 = t5.get_text_embeddings(batch_caption)
-            token_embedding_t5 = (latent_and_others_t5['token_embedding'].to(torch.float32) * 10.0).detach().cpu().numpy()
-            token_mask_t5 = latent_and_others_t5['token_mask'].detach().cpu().numpy()
-            token_t5 = latent_and_others_t5['tokens'].detach().cpu().numpy()
+            # _latent_t5, latent_and_others_t5 = t5.get_text_embeddings(batch_caption)
+            # token_embedding_t5 = (latent_and_others_t5['token_embedding'].to(torch.float32) * 10.0).detach().cpu().numpy()
+            # token_mask_t5 = latent_and_others_t5['token_mask'].detach().cpu().numpy()
+            # token_t5 = latent_and_others_t5['tokens'].detach().cpu().numpy()
 
-            for mt_256, mt_512, te_c, te_t, tm_c, tm_t, tk_c, tk_t, bc, bn in zip(moments_256, moments_512, token_embedding_clip, token_embedding_t5, token_mask_clip, token_mask_t5, token_clip, token_t5, batch_caption, batch_name):
+            for mt_256, mt_512, te_c, tm_c,  tk_c, bc, bn in zip(moments_256, moments_512, token_embedding_clip, token_mask_clip,token_clip, batch_caption, batch_name):
                 assert mt_256.shape == (8,32,32)
                 assert mt_512.shape == (8,64,64)
                 assert te_c.shape == (77, 768)
-                assert te_t.shape == (77, 4096)
+                # assert te_t.shape == (77, 4096)
                 tar_path_name = os.path.join(save_dir, f'{bn}.npy')
                 if os.path.exists(tar_path_name):
                     os.remove(tar_path_name)
                 data = {'image_latent_256': mt_256,
                         'image_latent_512': mt_512,
                         'token_embedding_clip': te_c, 
-                        'token_embedding_t5': te_t, 
+                        # 'token_embedding_t5': te_t, 
                         'token_mask_clip': tm_c,
-                        'token_mask_t5': tm_t,
+                        # 'token_mask_t5': tm_t,
                         'token_clip': tk_c,
-                        'token_t5': tk_t,
+                        # 'token_t5': tk_t,
                         'batch_caption': bc}
                 try:
                     np.save(tar_path_name, data)

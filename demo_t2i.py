@@ -187,6 +187,9 @@ def main(argv):
     config.output_path = FLAGS.output_path
     config.img_save_path = FLAGS.img_save_path
     config.cfg = FLAGS.cfg
+    # print config
+    print(f'config: {config}')
+    
     evaluate(config)
 
 

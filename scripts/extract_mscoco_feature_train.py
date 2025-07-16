@@ -25,10 +25,10 @@ def main(resolution=256):
     print(args)
 
     if args.split == "val":
-        datas = MSCOCODatabase(root='/data1/common_datasets/COCO/coco/images/val2017_256',
-                             annFile='/data1/common_datasets/COCO/coco/annotations/captions_val2017.json',
+        datas = MSCOCODatabase(root='/data1/common_datasets/COCO/coco/images/train2017_256',
+                             annFile='/data1/common_datasets/COCO/coco/annotations/captions_train2017.json',
                              size=resolution)
-        save_dir = f'val'
+        save_dir = f'train'
     else:
         raise NotImplementedError
 

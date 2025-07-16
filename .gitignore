@@ -1,0 +1,16 @@
+*.npy
+*.jpg
+*.png
+*.pth
+*.tar
+*.pyc
+*.ipynb
+
+assets/
+workdir/
+COCO_train/
+val/
+checkpoints/
+temp_saved_images/
+JourneyDB_demo/
+mscoco_features/

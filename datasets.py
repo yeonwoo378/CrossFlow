@@ -228,7 +228,7 @@ class JDBFeatureDataset(Dataset):
         self.file_list = []
         with open(json_path, 'r', encoding='utf-8') as file:
             for line in file:
-                self.file_list.append(json.loads(line)['img_path'])
+                self.file_list.append(json.loads(line)['img'])
 
     def __len__(self):
         return len(self.file_list)
@@ -248,7 +248,7 @@ class JDBFeatureDataset(Dataset):
         token_embedding = train_item[f'token_embedding_{self.llm}']
         token_mask = train_item[f'token_mask_{self.llm}']
         token = train_item[f'token_{self.llm}']
-        caption = train_item['batch_caption']
+        caption = 'caption' #train_item['batch_caption']
 
         img = center_crop_arr(pil_image, image_size=self.resolution)
         img = (img / 127.5 - 1.0).astype(np.float32)
@@ -266,7 +266,7 @@ class JDBFullFeatures(DatasetFactory):  # the moments calculated by Stable Diffu
 
         self.train = JDBFeatureDataset(train_path, resolution=resolution, llm=llm)
         self.test = MSCOCOFeatureDataset(os.path.join(val_path, 'val'), full_feature=True, fix_test_order=fix_test_order)
-        assert len(self.test) == 40504
+        # assert len(self.test) == 40504
         
         print('Prepare dataset ok')
 
@@ -301,5 +301,8 @@ class JDBFullFeatures(DatasetFactory):  # the moments calculated by Stable Diffu
 def get_dataset(name, **kwargs):
     if name == 'JDB_demo_features':
         return JDBFullFeatures(**kwargs)
+    
+    # if name == 'MSCOCO':
+    #     return MSCOCOFeatureDataset(**kwargs)
     else:
         raise NotImplementedError(name)
