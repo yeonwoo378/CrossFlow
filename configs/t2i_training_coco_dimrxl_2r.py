@@ -18,7 +18,7 @@ model = Args(
     cfg_indicator=0.1,
     textVAE = Args(
         num_blocks = 11,
-        hidden_dim = 1024,
+        hidden_dim = 960,
         hidden_token_length = 256,
         num_attention_heads = 8,
         dropout_prob = 0.1,
@@ -26,10 +26,10 @@ model = Args(
     stage_configs = [
             Args(
                 block_type = "TransformerBlock", 
-                dim = 1024,  # channel
+                dim = 960,  # channel
                 hidden_dim = 2048,
                 num_attention_heads = 16,
-                num_blocks = 24,  # depth
+                num_blocks = 39,  # depth
                 max_height = 16,
                 max_width = 16,
                 image_input_ratio = 1,
@@ -39,10 +39,10 @@ model = Args(
             ),
             Args(
                 block_type = "ConvNeXtBlock", 
-                dim = 512, 
+                dim = 480, 
                 hidden_dim = 1024, 
                 kernel_size = 7, 
-                num_blocks = 33,
+                num_blocks = 20,
                 max_height = 32,
                 max_width = 32,
                 image_input_ratio = 1,
@@ -70,11 +70,12 @@ def get_config():
 
     config.train = d(
         n_steps=1000000,
-        batch_size=64,
+        batch_size=256,
         mode='cond',
         log_interval=10,
         eval_interval=5000,
         save_interval=50000,
+        n_samples_eval=5,  
     )
 
     config.optimizer = d(

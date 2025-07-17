@@ -6,7 +6,6 @@ beautifulsoup4
 open_clip_torch
 scikit-image
 cython
-git+https://github.com/philferriere/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
 matplotlib
 accelerate==0.12.0
 absl-py
