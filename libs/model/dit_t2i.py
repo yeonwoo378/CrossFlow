@@ -134,9 +134,9 @@ class DiT(nn.Module):
         self,
         config,
         patch_size=2,
-        hidden_size=1152,
-        depth=28,
-        num_heads=16,
+        # hidden_size=1152,
+        # depth=28,
+        # num_heads=16,
         mlp_ratio=4.0,
         num_classes=2, # for cfg indicator
     ):
@@ -146,7 +146,9 @@ class DiT(nn.Module):
         self.in_channels = config.channels
         self.out_channels = self.in_channels * 2 if self.learn_sigma else self.in_channels
         self.patch_size = patch_size
-        self.num_heads = num_heads
+        self.num_heads = num_heads = config.num_heads
+        self.depth = depth = config.depth
+        self.hidden_size = hidden_size = config.hidden_size
 
         self.x_embedder = PatchEmbed(self.input_size, patch_size, self.in_channels, hidden_size, bias=True)
         self.t_embedder = TimestepEmbedder(hidden_size)
