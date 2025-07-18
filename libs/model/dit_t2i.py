@@ -126,6 +126,74 @@ class FinalLayer(nn.Module):
         return x
 
 
+class EstimatorBlock(nn.Module):
+    """
+    Transformer block that do not use adaLN modulation and conditioning.
+    """
+    def __init__(self, hidden_size, num_heads, mlp_ratio=4.0, **block_kwargs):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.attn = Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
+        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        mlp_hidden_dim = int(hidden_size * mlp_ratio)
+        approx_gelu = lambda: nn.GELU(approximate="tanh")
+        self.mlp = Mlp(in_features=hidden_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
+    def forward(self, x):
+        """
+        Forward pass of the EstimatorBlock.
+        x: (N, T, D) tensor of inputs, where T = H * W / patch_size ** 2
+        """
+        x = x + self.attn(self.norm1(x))
+        x = x + self.mlp(self.norm2(x))
+        return x
+    
+
+class Estimator(nn.Module):
+    """
+    Estimator for mean and variance.
+    """
+    def __init__(self, config, in_channels=4, num_blocks=12, patch_size=2, hidden_size=1152):
+        super().__init__()
+        self.in_channels = in_channels
+        self.x_embedder = PatchEmbed(self.input_size, patch_size, self.in_channels, hidden_size, bias=True)
+        num_patches = self.x_embedder.num_patches
+        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
+        pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.x_embedder.num_patches ** 0.5))
+        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
+        
+        self.blocks = nn.ModuleList([
+            EstimatorBlock(config.hidden_size, num_heads=config.num_heads, mlp_ratio=config.mlp_ratio) for _ in range(num_blocks)
+        ])
+        self.final_layer = FinalLayer(hidden_size, patch_size, self.in_channels * 2)  # output mu and log_var
+    
+    def unpatchify(self, x):
+        """
+        x: (N, T, patch_size**2 * C * 2)
+        imgs: (N, H, W, C*2)
+        """
+        c = self.in_channels * 2
+        p = self.x_embedder.patch_size[0]
+        h = w = int(x.shape[1] ** 0.5)
+        assert h * w == x.shape[1]
+
+        x = x.reshape(shape=(x.shape[0], h, w, p, p, c))
+        x = torch.einsum('nhwpqc->nchpwq', x)
+        imgs = x.reshape(shape=(x.shape[0], c, h * p, h * p))
+        return imgs
+
+    def forward(self, x):
+        """ Forward pass of the Estimator.
+        x: (N, C, H, W) tensor of spatial inputs (images or latent representations of images)
+        """
+        x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
+        for block in self.blocks:
+            x = block(x)
+        x = self.final_layer(x)
+        x = self.unpatchify(x)  # (N, out_channels * 2, H, W)
+        mu, log_var = torch.chunk(x, 2, dim=1)
+    
+        return mu, log_var
+
 class DiT(nn.Module):
     """
     Diffusion model with a Transformer backbone.
@@ -161,6 +229,8 @@ class DiT(nn.Module):
             DiTBlock(hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(depth)
         ])
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
+        self._mean_var_estimator = Estimator(config, in_channels=self.in_channels, num_blocks=12, patch_size=patch_size, hidden_size=hidden_size)
+        
         self.initialize_weights()
 
         ######### CrossFlow related
@@ -168,11 +238,12 @@ class DiT(nn.Module):
             down_sample_block = config.textVAE.num_down_sample_block
         else:
             down_sample_block = 3
+        
+        # NOTE: context encoder is only traning for CrossFlw
         self.context_encoder = TransEncoder(d_model=config.clip_dim, N=config.textVAE.num_blocks, num_token=config.num_clip_token,
                                             head_num=config.textVAE.num_attention_heads, d_ff=config.textVAE.hidden_dim, 
                                             latten_size=config.channels * config.latent_size * config.latent_size * 2, 
                                             down_sample_block=down_sample_block, dropout=config.textVAE.dropout_prob, last_norm=False)
-
 
         self.open_clip, _, self.open_clip_preprocess = open_clip.create_model_and_transforms('ViT-L-16-SigLIP-256', pretrained=None)
         self.open_clip_output = Adaptor(input_dim=1024, 
@@ -288,12 +359,14 @@ class DiT(nn.Module):
 
         return image_latent, self.open_clip.logit_scale
     
-    def forward(self, x, t = None, log_snr = None, text_encoder=False, text_decoder=False, image_clip=False, shape=None, mask=None, null_indicator=None):
+    def forward(self, x, t = None, log_snr = None, text_encoder=False, text_decoder=False, image_clip=False, shape=None, mask=None, null_indicator=None, estimator=False):
         if text_encoder:
             return self._text_encoder(condition_context = x, tar_shape=shape, mask=mask)
         elif text_decoder:
             raise NotImplementedError
             return self._text_decoder(condition_enbedding = x, tar_shape=shape) # mask is not needed for decoder
+        elif estimator:
+            return self._mean_var_estimator(x)
         elif image_clip:
             return self._img_clip(image_input = x) 
         else:

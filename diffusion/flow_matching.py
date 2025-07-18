@@ -308,7 +308,7 @@ class FlowMatching(nn.Module):
     # model forward and prediction
     def forward(
         self,
-        x,
+        x, # x1
         nnet,
         loss_coeffs,
         cond,
@@ -355,13 +355,14 @@ class FlowMatching(nn.Module):
 
     def p_losses_textVAE(
         self,
-        x_start,
+        x_start, # img_x1 or None
         cond,
         con_mask,
         t,
         nnet,
         loss_coeffs,
         training_step,
+        estimator=None,
         text_token=None,
         nnet_style=None,
         all_config=None,
@@ -379,7 +380,18 @@ class FlowMatching(nn.Module):
 
         assert noise is None
 
-        x0, mu, log_var = nnet(cond, text_encoder = True, shape = x_start.shape, mask = con_mask)
+       
+        if estimator is not None:
+            # TODO: if ours, sample x0 from estimator
+            mu, log_var = nnet(cond, text_encoder = True, shape = x_start.shape, mask = con_mask)
+            x0 = mu + torch.exp(log_var / 2) * torch.randn_like(mu, device=mu.device)
+            
+        elif x_start is not None: # DiMR
+            x1 = x_start
+            pass
+        else: # CrossFlow
+            # For ours, use this only for text flow when t=1
+            x_start, text_mu, text_log_var = nnet(cond, text_encoder = True, shape = x_start.shape, mask = con_mask)
 
         ############ loss for Text VE
         if batch_img_clip.shape[-1] == 512:
@@ -387,15 +399,15 @@ class FlowMatching(nn.Module):
         else:
             recon_gt = batch_img_clip
         recon_gt_clip, logit_scale = nnet(recon_gt, image_clip = True) 
-        image_features = recon_gt_clip / recon_gt_clip.norm(dim=-1, keepdim=True)
-        text_features = x0 / x0.norm(dim=-1, keepdim=True)
-        recons_loss = self.clip_loss(image_features, text_features, logit_scale)
+        # image_features = recon_gt_clip / recon_gt_clip.norm(dim=-1, keepdim=True)
+        # text_features = x0 / x0.norm(dim=-1, keepdim=True)
+        # recons_loss = self.clip_loss(image_features, text_features, logit_scale)
 
         # kld_loss = -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1)
-        kld_loss = -0.5 * torch.sum(1 + log_var - (0.3 * mu) ** 6 - log_var.exp(), dim = 1) # slightly different KL loss function: mu -> 0 [(0.3*mu) ** 6] and var -> 1
+        kld_loss = -0.5 * torch.sum(1 + text_log_var - (0.3 * text_mu) ** 6 - text_log_var.exp(), dim = 1) # slightly different KL loss function: mu -> 0 [(0.3*mu) ** 6] and var -> 1
         kld_loss_weight = 1e-2 # 0.0005
 
-        loss_mlp = recons_loss + kld_loss * kld_loss_weight
+        loss_mlp = kld_loss * kld_loss_weight
         
         
         ############ loss for FM
@@ -431,7 +443,8 @@ class FlowMatching(nn.Module):
 
         loss = loss_diff + loss_mlp
         
-        return loss, {'loss_diff': loss_diff, 'clip_loss': recons_loss, 'kld_loss': kld_loss, 'kld_loss_weight': torch.tensor(kld_loss_weight, device=kld_loss.device), 'clip_logit_scale': logit_scale}
+        return loss, {'loss_diff': loss_diff, 'kl_loss': kld_loss, 'text_kl_loss_weight': torch.tensor(kld_loss_weight, device=kld_loss.device), 'clip_logit_scale': logit_scale}, \
+            {'mu': mu, 'log_var': log_var}
         
 
     def p_losses_textVAE_dit(

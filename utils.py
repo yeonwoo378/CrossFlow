@@ -156,6 +156,72 @@ class TrainState(object):
             if isinstance(val, nn.Module):
                 val.to(device)
 
+class TrainStateOurs(object): # Actually compatible with TrainState.. Delete this later
+    def __init__(self, optimizer, lr_scheduler, step, nnets=None, nnet_emas=None, estimators=None):
+        self.optimizer = optimizer
+        self.lr_scheduler = lr_scheduler
+        self.step = step
+        self.nnets = nnets
+        self.nnet_emas = nnet_emas
+        
+        self.text_nnet = nnets[0]
+        self.img_nnet = nnets[1]
+        
+        self.text_nnet_ema = nnet_emas[0]
+        self.img_nnet_ema = nnet_emas[1]
+        
+        self.text_estimator = estimators[0]
+        self.img_estimator = estimators[1]
+
+    def ema_update(self, rate=0.9999):
+        if self.nnet_emas is not None:
+            for nnet, nnet_ema in zip(self.nnets, self.nnet_emas):
+                ema(nnet_ema, nnet, rate)
+
+    def save(self, path):
+        os.makedirs(path, exist_ok=True)
+        torch.save(self.step, os.path.join(path, 'step.pth'))
+        for key, val in self.__dict__.items():
+            if key != 'step' and val is not None:
+                if isinstance(val, list):
+                    for i, v in enumerate(val):
+                        torch.save(v.state_dict(), os.path.join(path, f'{key}_{i}.pth'))
+                else:
+                    torch.save(val.state_dict(), os.path.join(path, f'{key}.pth'))
+
+
+    def load(self, path):
+        logging.info(f'load from {path}')
+        self.step = torch.load(os.path.join(path, 'step.pth'))
+        for key, val in self.__dict__.items():
+            if key != 'step' and val is not None:
+                if isinstance(val, list):
+                    for i, v in enumerate(val):
+                        v.load_state_dict(torch.load(os.path.join(path, f'{key}_{i}.pth'), map_location='cpu'))
+                else:
+                    val.load_state_dict(torch.load(os.path.join(path, f'{key}.pth'), map_location='cpu'))
+
+    def resume(self, ckpt_root, step=None):
+        if not os.path.exists(ckpt_root):
+            return
+        if step is None:
+            ckpts = list(filter(lambda x: '.ckpt' in x, os.listdir(ckpt_root)))
+            if not ckpts:
+                return
+            steps = map(lambda x: int(x.split(".")[0]), ckpts)
+            step = max(steps)
+        ckpt_path = os.path.join(ckpt_root, f'{step}.ckpt')
+        logging.info(f'resume from {ckpt_path}')
+        self.load(ckpt_path)
+
+    def to(self, device):
+        for key, val in self.__dict__.items():
+            if isinstance(val, nn.Module):
+                val.to(device)
+            elif isinstance(val, list):
+                for v in val:
+                    v.to(device)
+
 
 def trainable_parameters(nnet):
     params_decay = []
@@ -175,18 +241,39 @@ def trainable_parameters(nnet):
 
 
 def initialize_train_state(config, device):
+    if 'ours' in config.get('exp_name', ''):
+        text_nnet = get_nnet(**config.text_nnet)
+        text_nnet_ema = get_nnet(**config.text_nnet)
+        text_nnet_ema.eval()
+        img_nnet = get_nnet(**config.img_nnet)
+        img_nnet_ema = get_nnet(**config.img_nnet)
+        img_nnet_ema.eval()
+        
+        text_estimator = get_nnet(**config.text_extimator)
+        img_estimator = get_nnet(**config.img_extimator)
+        
+        trainable_params = trainable_parameters(text_nnet) + trainable_parameters(img_nnet) + trainable_parameters(text_estimator) + trainable_parameters(img_estimator)
+        optimizer = get_optimizer(trainable_params, **config.optimizer)
+        lr_scheduler = get_lr_scheduler(optimizer, **config.lr_scheduler)
+        train_state = TrainStateOurs(optimizer=optimizer, lr_scheduler=lr_scheduler, step=0,
+                                 nnets=[text_nnet, img_nnet],
+                                 nnet_emas=[text_nnet_ema, img_nnet_ema],
+                                 estimators=[text_estimator, img_estimator])
+        train_state.ema_update(0)
+        train_state.to(device)
+                    
+    else:   # CrossFlow
+        nnet = get_nnet(**config.nnet)
+        nnet_ema = get_nnet(**config.nnet)
+        nnet_ema.eval()
 
-    nnet = get_nnet(**config.nnet)
-    nnet_ema = get_nnet(**config.nnet)
-    nnet_ema.eval()
+        optimizer = get_optimizer(trainable_parameters(nnet), **config.optimizer)
+        lr_scheduler = get_lr_scheduler(optimizer, **config.lr_scheduler)
 
-    optimizer = get_optimizer(trainable_parameters(nnet), **config.optimizer)
-    lr_scheduler = get_lr_scheduler(optimizer, **config.lr_scheduler)
-
-    train_state = TrainState(optimizer=optimizer, lr_scheduler=lr_scheduler, step=0,
-                             nnet=nnet, nnet_ema=nnet_ema)
-    train_state.ema_update(0)
-    train_state.to(device)
+        train_state = TrainState(optimizer=optimizer, lr_scheduler=lr_scheduler, step=0,
+                                nnets=[nnet], nnet_emas=[nnet_ema])
+        train_state.ema_update(0)
+        train_state.to(device)
     return train_state
 
 
@@ -272,3 +359,12 @@ def grad_norm(model):
         total_norm += param_norm.item() ** 2
     total_norm = total_norm ** (1. / 2)
     return total_norm
+
+
+def kl_divergence(mu_p, log_var_p, mu_q, log_var_q):
+    """
+    Compute the KL divergence between two Gaussian distributions.
+    """
+    # KL(p||q)
+    # return -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=-1)
+    return 0.5 * (log_var_q - log_var_p + (torch.exp(log_var_p) + (mu_p - mu_q).pow(2)) / torch.exp(log_var_q) - 1).mean()

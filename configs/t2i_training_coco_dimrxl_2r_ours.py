@@ -7,7 +7,7 @@ class Args:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-model = Args(
+text_model = Args(
     channels = 4,
     block_grad_to_lowres = False,
     norm_type = "TDRMSN",
@@ -22,7 +22,7 @@ model = Args(
         hidden_token_length = 256,
         num_attention_heads = 8,
         dropout_prob = 0.1,
-    ),
+    ), 
     stage_configs = [
             Args(
                 block_type = "TransformerBlock", 
@@ -52,6 +52,51 @@ model = Args(
             ),
     ],
 )
+
+
+
+img_model = Args(
+    channels = 4,
+    block_grad_to_lowres = False,
+    norm_type = "TDRMSN",
+    use_t2i = True,
+    clip_dim=768,
+    num_clip_token=77,
+    gradient_checking=True,
+    cfg_indicator=0.1,
+    textVAE = None,  # no textVAE for image model
+    stage_configs = [
+            Args(
+                block_type = "TransformerBlock", 
+                dim = 960,  # channel
+                hidden_dim = 2048,
+                num_attention_heads = 16,
+                num_blocks = 39,  # depth
+                max_height = 16,
+                max_width = 16,
+                image_input_ratio = 1,
+                input_feature_ratio = 2,
+                final_kernel_size = 3,
+                dropout_prob = 0,
+            ),
+            Args(
+                block_type = "ConvNeXtBlock", 
+                dim = 480, 
+                hidden_dim = 1024, 
+                kernel_size = 7, 
+                num_blocks = 20,
+                max_height = 32,
+                max_width = 32,
+                image_input_ratio = 1,
+                input_feature_ratio = 1,
+                final_kernel_size = 3,
+                dropout_prob = 0,
+            ),
+    ],
+)
+
+
+
 def d(**kwargs):
     """Helper of creating a config dict."""
     return ml_collections.ConfigDict(initial_dictionary=kwargs)
@@ -90,10 +135,15 @@ def get_config():
         warmup_steps=5000
     )
 
-    global model
-    config.nnet = d(
+    global text_model
+    config.text_nnet = d(
         name='dimr',
-        model_args=model,
+        model_args=text_model,
+    )
+    global img_model
+    config.img_nnet = d(
+        name='dimr',
+        model_args=img_model,
     )
     config.loss_coeffs = [1/4, 1]
                            # weight on loss, only needed for DiMR. Here, loss = 1/4 * loss_block1 + 1/2 * loss_block2 + 1 * loss_block3
@@ -115,5 +165,7 @@ def get_config():
         scale=7,                                                # cfg scale
         path=''
     )
+    
+    config.exp_name = 'dimrxl_2r_ours'  # experiment name
 
     return config
