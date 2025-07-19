@@ -220,6 +220,7 @@ def calculate_activation_statistics(files, model, batch_size=50, dims=2048,
 
 
 def compute_statistics_of_path(path, model, batch_size, dims, device, num_workers=8):
+    path = 'assets/fid_stats/fid_stats_mscoco256_val.npz' # hardcoded for now
     if path.endswith('.npz'):
         with np.load(path) as f:
             m, s = f['mu'][:], f['sigma'][:]

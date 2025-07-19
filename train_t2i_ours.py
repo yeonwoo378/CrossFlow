@@ -48,7 +48,7 @@ def train(config):
         os.makedirs(config.sample_dir, exist_ok=True)
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        wandb.init(dir=os.path.abspath(config.workdir), project=f'uvit_{config.dataset.name}', config=config.to_dict(),
+        wandb.init(dir=os.path.abspath(config.workdir), project=f'Bidirectional-flow-MSCOCO', config=config.to_dict(),
                    name=config.hparams, job_type='train', mode='online')
         utils.set_logger(log_level='info', fname=os.path.join(config.workdir, 'output.log'))
         logging.info(config)
@@ -73,24 +73,24 @@ def train(config):
 
     train_state = utils.initialize_train_state(config, device) # TODO. check
     
-    text_nnet, text_nnet_ema, img_nnet, img_nnet_ema, text_estimator, img_estimator, optimizer, train_dataset_loader, test_dataset_loader = accelerator.prepare(
-        train_state.text_nnet, train_state.text_nnet_ema, train_state.img_nnet, train_state.img_nnet_ema, train_state.text_estimator, train_state.img_estimator, train_state.optimizer, train_dataset_loader, test_dataset_loader)
+    text_nnet, text_nnet_ema, img_nnet, img_nnet_ema, optimizer, train_dataset_loader, test_dataset_loader = accelerator.prepare(
+        train_state.text_nnet, train_state.text_nnet_ema, train_state.img_nnet, train_state.img_nnet_ema, train_state.optimizer, train_dataset_loader, test_dataset_loader)
     lr_scheduler = train_state.lr_scheduler
     train_state.resume(config.ckpt_root, step=config.get('resume_step', None))
 
     autoencoder = libs.autoencoder.get_model(**config.autoencoder)
     autoencoder.to(device)
 
-    if config.nnet.model_args.clip_dim == 4096:
-        llm = "t5"
-        t5 = T5Embedder(device=device)
-    elif config.nnet.model_args.clip_dim == 768:
-        llm = "clip"
-        clip = FrozenCLIPEmbedder()
-        clip.eval()
-        clip.to(device)
-    else:
-        raise NotImplementedError
+    # if config.nnet.model_args.clip_dim == 4096:
+    #     llm = "t5"
+    #     t5 = T5Embedder(device=device)
+    # elif config.nnet.model_args.clip_dim == 768:
+    llm = "clip"
+    clip = FrozenCLIPEmbedder()
+    clip.eval()
+    clip.to(device)
+    # else:
+    #     raise NotImplementedError
 
     ss_empty_context = None
 
@@ -146,31 +146,47 @@ def train(config):
         _batch_caption = _batch[4] # currently not using. caption is only used for clipscore evaluation
         _batch_img_ori = _batch[5]
 
-        _z = autoencoder.sample(_batch_img) # img_x1
-            
-        img_loss, img_loss_dict, img_mu_logvar_dict = _flow_mathcing_model(_z, img_nnet, loss_coeffs=config.loss_coeffs, cond=_batch_con, con_mask=_batch_mask, batch_img_clip=_batch_img_ori, \
-            nnet_style=config.nnet.name, text_token=_batch_token, model_config=config.nnet.model_args, all_config=config, training_step=train_state.step)
-        text_loss, text_loss_dict, text_mu_logvar_dict = _flow_mathcing_model(None, text_nnet, loss_coeffs=config.loss_coeffs, cond=_batch_con, con_mask=_batch_mask, batch_img_clip=_batch_img_ori, \
-            nnet_style=config.nnet.name, text_token=_batch_token, model_config=config.nnet.model_args, all_config=config, training_step=train_state.step)
+        img_x1  = autoencoder.sample(_batch_img) # img_x1
         
-        # Define IVW loss
-        img_var = torch.exp(img_mu_logvar_dict['log_var'])
-        text_var = torch.exp(text_mu_logvar_dict['log_var'])
-        img_mu = img_mu_logvar_dict['mu']
-        text_mu = text_mu_logvar_dict['mu']
+        img_mu, img_logvar = _flow_mathcing_model.predict_mean_and_log_var(
+            img_x1, None, None, modality='image', nnet=img_nnet
+        )
+        
+        text_x1, text_mu, text_logvar = _flow_mathcing_model.predict_mean_and_log_var(
+            None, _batch_con, _batch_mask, modality='text', nnet=text_nnet
+        )
+        text_x1 = text_x1.reshape((text_x1.shape[0], 4, 32, 32))
+        img_var = torch.exp(img_logvar) + 1e-6
+        text_var = torch.exp(text_logvar) + 1e-6
         
         z_mu = (img_mu / img_var + text_mu / text_var) / (1 / img_var + 1 / text_var)
         z_var = 1 / (1 / img_var + 1 / text_var)
+        # sample z
+        z = z_mu + torch.exp(z_var / 2) * torch.randn_like(z_mu, device=device)
+        z_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), torch.zeros_like(z_mu), torch.ones_like(z_var))
+        img_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), img_mu, img_logvar)
+        text_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), text_mu, text_logvar)            
+        img_loss, img_loss_dict= _flow_mathcing_model(z, img_x1, img_nnet, loss_coeffs=config.loss_coeffs, cond=_batch_con, con_mask=_batch_mask, batch_img_clip=_batch_img_ori, \
+            nnet_style=config.img_nnet.name, text_token=_batch_token, model_config=config.img_nnet.model_args, all_config=config, training_step=train_state.step)
         
-        z_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), torch.zeros_like(z_mu), torch.zeros_like(z_var))
-        img_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), img_mu, img_mu_logvar_dict['log_var'])
-        text_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), text_mu, text_mu_logvar_dict['log_var'])
+        # text_x1 -> z
+        text_loss, text_loss_dict = _flow_mathcing_model(text_x1, z, text_nnet, loss_coeffs=config.loss_coeffs, cond=_batch_con, con_mask=_batch_mask, batch_img_clip=_batch_img_ori, \
+            nnet_style=config.text_nnet.name, text_token=_batch_token, model_config=config.text_nnet.model_args, all_config=config, training_step=train_state.step)
+
+
         _metrics['z_kl_loss'] = accelerator.gather(z_kl_loss.detach()).mean()
         _metrics['img_kl_loss'] = accelerator.gather(img_kl_loss.detach()).mean()
         _metrics['text_kl_loss'] = accelerator.gather(text_kl_loss.detach()).mean()
         
+        # log norm of mu and variance
+        _metrics['img_mu_norm'] = accelerator.gather(img_mu.norm(dim=1).detach()).mean()
+        _metrics['img_var_norm'] = accelerator.gather(img_var.norm(dim=1).detach()).mean()
+        _metrics['text_mu_norm'] = accelerator.gather(text_mu.norm(dim=1).detach()).mean()
+        _metrics['text_var_norm'] = accelerator.gather(text_var.norm(dim=1).detach()).mean()
+
         
-        loss = img_loss + text_loss + config.get('kl_loss_coeff', 0.01) * (img_kl_loss + text_kl_loss + z_kl_loss)
+        
+        loss = img_loss + text_loss + config.get('kl_loss_coeff', 0.01) * (z_kl_loss + img_kl_loss + text_kl_loss)
         _metrics['loss'] = accelerator.gather(loss.detach()).mean()
         
         # for key in loss_dict.keys():
@@ -195,15 +211,17 @@ def train(config):
                     
                 _z_x0, _mu, _log_var = nnet_ema(context, text_encoder = True, shape = _z_gaussian.shape, mask=token_mask)
                 _z_init = _z_x0.reshape(_z_gaussian.shape)
+            else:
+                _z_init = z_init
             # else use the provided z_init (latent)
             
-            assert config.sample.scale > 1
-            _cfg = config.sample.scale
+            # assert config.sample.scale > 1
+            # _cfg = config.sample.scale
 
-            has_null_indicator = hasattr(config.nnet.model_args, "cfg_indicator")
+            has_null_indicator = hasattr(config.img_nnet.model_args, "cfg_indicator")
 
-            ode_solver = ODEEulerFlowMatchingSolver(nnet_ema, step_size_type="step_in_dsigma", guidance_scale=_cfg)
-            _z, _ = ode_solver.sample(x_T=_z_init, batch_size=_n_samples, sample_steps=_sample_steps, unconditional_guidance_scale=_cfg, has_null_indicator=has_null_indicator)
+            ode_solver = ODEEulerFlowMatchingSolver(nnet_ema, step_size_type="step_in_dsigma", guidance_scale=1.)
+            _z, _ = ode_solver.sample(x_T=_z_init, batch_size=_n_samples, sample_steps=_sample_steps, unconditional_guidance_scale=1.0, has_null_indicator=has_null_indicator)
 
             
             if not decode_image:
@@ -225,26 +243,28 @@ def train(config):
             _context, _token_mask, _token, _caption, _testbatch_img_blurred = next(context_generator)
             assert _context.size(0) == _n_samples
             assert not return_caption # during training we should not use this 
-            if return_caption: # currently not used TODO: fix this
+            if False: #return_caption: # currently not used TODO: fix this
                 return ode_fm_solver_sample(nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask), _caption
             elif return_clipScore: # currently not used TODO: fix this
-                return ode_fm_solver_sample(nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask, return_clipScore=return_clipScore, ClipSocre_model=ClipSocre_model, caption=_caption)
+                # Warning: not correct. just placeholder
+                return ode_fm_solver_sample(text_nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask, return_clipScore=return_clipScore, ClipSocre_model=ClipSocre_model, caption=_caption)
             else:
+                # reverse sampling ..  text -> z -> image
                 z = ode_fm_solver_sample(text_nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask, decode_image=False)
-                return  ode_fm_solver_sample(img_nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask)
+                return  ode_fm_solver_sample(img_nnet_ema, _n_samples, sample_steps, z_init=z,  context=_context, token_mask=_token_mask)
 
         with tempfile.TemporaryDirectory() as temp_path:
             path = config.sample.path or temp_path
             if accelerator.is_main_process:
                 os.makedirs(path, exist_ok=True)
-            clip_score_list = utils.sample2dir(accelerator, path, n_samples, config.sample.mini_batch_size, sample_fn, dataset.unpreprocess, return_clipScore=True, ClipSocre_model=ClipSocre_model, config=config)
+            # clip_score_list = utils.sample2dir(accelerator, path, n_samples, config.sample.mini_batch_size, sample_fn, dataset.unpreprocess, return_clipScore=True, ClipSocre_model=ClipSocre_model, config=config)
             _fid = 0
             if accelerator.is_main_process:
                 _fid = calculate_fid_given_paths((dataset.fid_stat, path))
-                _clip_score_list = torch.cat(clip_score_list)
-                logging.info(f'step={train_state.step} fid{n_samples}={_fid} clip_score{len(_clip_score_list)} = {_clip_score_list.mean().item()}')
+                # _clip_score_list = torch.cat(clip_score_list)
+                logging.info(f'step={train_state.step} fid{n_samples}={_fid}') #  clip_score{len(_clip_score_list)} = {_clip_score_list.mean().item()}')
                 with open(os.path.join(config.workdir, 'eval.log'), 'a') as f:
-                    print(f'step={train_state.step} fid{n_samples}={_fid} clip_score{len(_clip_score_list)} = {_clip_score_list.mean().item()}', file=f)
+                    print(f'step={train_state.step} fid{n_samples}={_fid}') # clip_score{len(_clip_score_list)} = {_clip_score_list.mean().item()}', file=f)
                 wandb.log({f'fid{n_samples}': _fid}, step=train_state.step)
             _fid = torch.tensor(_fid, device=device)
             _fid = accelerator.reduce(_fid, reduction='sum')
@@ -347,8 +367,8 @@ def get_hparams():
                 val = Path(val).stem
             lst.append(f'{hparam}={val}')
     hparams = '-'.join(lst)
-    if hparams == '':
-        hparams = 'default'
+    # if hparams == '':
+    #     hparams = 'default'
     return hparams
 
 
@@ -356,7 +376,8 @@ def main(argv):
     config = FLAGS.config
     config.config_name = get_config_name()
     config.hparams = get_hparams()
-    config.workdir = FLAGS.workdir or os.path.join('workdir', config.config_name, config.hparams)
+    config.exp_name = config.get('exp_name', 'default')
+    config.workdir = FLAGS.workdir or os.path.join('workdir', config.config_name, config.exp_name, config.hparams)
     config.ckpt_root = os.path.join(config.workdir, 'ckpts')
     config.sample_dir = os.path.join(config.workdir, 'samples')
     train(config)

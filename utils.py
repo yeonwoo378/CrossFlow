@@ -61,8 +61,10 @@ def get_nnet(name, **kwargs):
         from libs.model.dimr_t2i import MRModel
         return MRModel(kwargs["model_args"])
     elif name == 'dit':
-        from libs.model.dit_t2i import DiT_H_2
-        return DiT_H_2(kwargs["model_args"])
+        from libs.model.dit_t2i import DiT_H_2, DiT
+        # return DiT_H_2(kwargs["model_args"])
+        return DiT(kwargs["model_args"])
+        
     else:
         raise NotImplementedError(name)
 
@@ -157,7 +159,7 @@ class TrainState(object):
                 val.to(device)
 
 class TrainStateOurs(object): # Actually compatible with TrainState.. Delete this later
-    def __init__(self, optimizer, lr_scheduler, step, nnets=None, nnet_emas=None, estimators=None):
+    def __init__(self, optimizer, lr_scheduler, step, nnets=None, nnet_emas=None):
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.step = step
@@ -169,9 +171,7 @@ class TrainStateOurs(object): # Actually compatible with TrainState.. Delete thi
         
         self.text_nnet_ema = nnet_emas[0]
         self.img_nnet_ema = nnet_emas[1]
-        
-        self.text_estimator = estimators[0]
-        self.img_estimator = estimators[1]
+
 
     def ema_update(self, rate=0.9999):
         if self.nnet_emas is not None:
@@ -248,17 +248,14 @@ def initialize_train_state(config, device):
         img_nnet = get_nnet(**config.img_nnet)
         img_nnet_ema = get_nnet(**config.img_nnet)
         img_nnet_ema.eval()
+  
         
-        text_estimator = get_nnet(**config.text_extimator)
-        img_estimator = get_nnet(**config.img_extimator)
-        
-        trainable_params = trainable_parameters(text_nnet) + trainable_parameters(img_nnet) + trainable_parameters(text_estimator) + trainable_parameters(img_estimator)
+        trainable_params = trainable_parameters(text_nnet) + trainable_parameters(img_nnet) 
         optimizer = get_optimizer(trainable_params, **config.optimizer)
         lr_scheduler = get_lr_scheduler(optimizer, **config.lr_scheduler)
         train_state = TrainStateOurs(optimizer=optimizer, lr_scheduler=lr_scheduler, step=0,
                                  nnets=[text_nnet, img_nnet],
-                                 nnet_emas=[text_nnet_ema, img_nnet_ema],
-                                 estimators=[text_estimator, img_estimator])
+                                 nnet_emas=[text_nnet_ema, img_nnet_ema])
         train_state.ema_update(0)
         train_state.to(device)
                     
@@ -291,7 +288,7 @@ def sample2dir(accelerator, path, n_samples, mini_batch_size, sample_fn, unprepr
 
     if return_clipScore:
         assert ClipSocre_model is not None
-
+        
     for _batch_size in tqdm(amortize(n_samples, batch_size), disable=not accelerator.is_main_process, desc='sample2dir'):
         samples, clip_score = sample_fn(mini_batch_size, return_clipScore=return_clipScore, ClipSocre_model=ClipSocre_model, config=config)
         samples = unpreprocess_fn(samples)

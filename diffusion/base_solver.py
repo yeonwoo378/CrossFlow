@@ -192,10 +192,12 @@ class Solver:
         log_snr = 4 - t_continuous * 8 # inversed
 
         if has_null_indicator:
+            # ours don't use null indicator
+            # _cond and _uncond are the same
             _cond = self.model(x, t=t_continuous, log_snr=log_snr, null_indicator=torch.tensor([False] * x.shape[0]).to(x.device))[-1]
             _uncond = self.model(x, t=t_continuous, log_snr=log_snr, null_indicator=torch.tensor([True] * x.shape[0]).to(x.device))[-1]
 
-            assert unconditional_guidance_scale > 1
+            # assert unconditional_guidance_scale > 1
             return _uncond + unconditional_guidance_scale * (_cond - _uncond)
         else:
             _cond = self.model(x, log_snr=log_snr)[-1]

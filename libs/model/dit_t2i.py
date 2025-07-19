@@ -61,17 +61,17 @@ class TimestepEmbedder(nn.Module):
         return t_emb
 
 
-class LabelEmbedder(nn.Module):
-    """
-    CrossFlow: update it for CFG with indicator
-    """
-    def __init__(self, num_classes, hidden_size):
-        super().__init__()
-        self.embedding_table = nn.Embedding(num_classes, hidden_size)
+# class LabelEmbedder(nn.Module):
+#     """
+#     CrossFlow: update it for CFG with indicator
+#     """
+#     def __init__(self, num_classes, hidden_size):
+#         super().__init__()
+#         self.embedding_table = nn.Embedding(num_classes, hidden_size)
 
-    def forward(self, labels):
-        embeddings = self.embedding_table(labels.int())
-        return embeddings
+#     def forward(self, labels):
+#         embeddings = self.embedding_table(labels.int())
+#         return embeddings
 
 
 #################################################################################
@@ -132,6 +132,9 @@ class EstimatorBlock(nn.Module):
     """
     def __init__(self, hidden_size, num_heads, mlp_ratio=4.0, **block_kwargs):
         super().__init__()
+        
+        # input_size ->
+        
         self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         self.attn = Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
         self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
@@ -146,8 +149,25 @@ class EstimatorBlock(nn.Module):
         x = x + self.attn(self.norm1(x))
         x = x + self.mlp(self.norm2(x))
         return x
-    
 
+
+class EstimatorFinalLayer(nn.Module):
+
+    def __init__(self, hidden_size, patch_size, out_channels):
+        super().__init__()
+        self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        
+        self.linear = nn.Linear(hidden_size, patch_size * patch_size * out_channels, bias=True)
+
+    def forward(self, x):
+        """
+        Forward pass of the EstimatorFinalLayer.
+        x: (N, T, D) tensor of inputs, where T = H * W / patch_size ** 2
+        """
+        x = self.norm_final(x)
+        x = self.linear(x)
+        return x
+        
 class Estimator(nn.Module):
     """
     Estimator for mean and variance.
@@ -155,16 +175,16 @@ class Estimator(nn.Module):
     def __init__(self, config, in_channels=4, num_blocks=12, patch_size=2, hidden_size=1152):
         super().__init__()
         self.in_channels = in_channels
-        self.x_embedder = PatchEmbed(self.input_size, patch_size, self.in_channels, hidden_size, bias=True)
+        self.x_embedder = PatchEmbed(32, patch_size, self.in_channels, hidden_size, bias=True)
         num_patches = self.x_embedder.num_patches
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
         pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.x_embedder.num_patches ** 0.5))
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
         
         self.blocks = nn.ModuleList([
-            EstimatorBlock(config.hidden_size, num_heads=config.num_heads, mlp_ratio=config.mlp_ratio) for _ in range(num_blocks)
+            EstimatorBlock(hidden_size, num_heads=8, mlp_ratio=4) for _ in range(num_blocks)
         ])
-        self.final_layer = FinalLayer(hidden_size, patch_size, self.in_channels * 2)  # output mu and log_var
+        self.final_layer = EstimatorFinalLayer(hidden_size, patch_size, self.in_channels * 2)  # output mu and log_var
     
     def unpatchify(self, x):
         """
@@ -185,6 +205,7 @@ class Estimator(nn.Module):
         """ Forward pass of the Estimator.
         x: (N, C, H, W) tensor of spatial inputs (images or latent representations of images)
         """
+        # import ipdb; ipdb.set_trace()
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         for block in self.blocks:
             x = block(x)
@@ -220,7 +241,7 @@ class DiT(nn.Module):
 
         self.x_embedder = PatchEmbed(self.input_size, patch_size, self.in_channels, hidden_size, bias=True)
         self.t_embedder = TimestepEmbedder(hidden_size)
-        self.y_embedder = LabelEmbedder(num_classes, hidden_size)
+        # self.y_embedder = LabelEmbedder(num_classes, hidden_size)
         num_patches = self.x_embedder.num_patches
         # Will use fixed sin-cos embedding:
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
@@ -230,7 +251,7 @@ class DiT(nn.Module):
         ])
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
         self._mean_var_estimator = Estimator(config, in_channels=self.in_channels, num_blocks=12, patch_size=patch_size, hidden_size=hidden_size)
-        
+        self._mean_var_estimator.train()
         self.initialize_weights()
 
         ######### CrossFlow related
@@ -239,18 +260,36 @@ class DiT(nn.Module):
         else:
             down_sample_block = 3
         
-        # NOTE: context encoder is only traning for CrossFlw
-        self.context_encoder = TransEncoder(d_model=config.clip_dim, N=config.textVAE.num_blocks, num_token=config.num_clip_token,
+        # NOTE: context encoder is only traning for CrossFlow
+        if config.textVAE is not None:
+            self.context_encoder = TransEncoder(d_model=config.clip_dim, N=config.textVAE.num_blocks, num_token=config.num_clip_token,
                                             head_num=config.textVAE.num_attention_heads, d_ff=config.textVAE.hidden_dim, 
                                             latten_size=config.channels * config.latent_size * config.latent_size * 2, 
                                             down_sample_block=down_sample_block, dropout=config.textVAE.dropout_prob, last_norm=False)
-
-        self.open_clip, _, self.open_clip_preprocess = open_clip.create_model_and_transforms('ViT-L-16-SigLIP-256', pretrained=None)
-        self.open_clip_output = Adaptor(input_dim=1024, 
-                                    tar_dim=config.channels * config.latent_size * config.latent_size
-                                    )
-        del self.open_clip.text
-        del self.open_clip.logit_bias
+            ckpt_path = 't2i_256px_clip_dimr.pth'
+            ckpt = torch.load(ckpt_path, map_location='cpu')
+            context_encoder_state_dict = {}
+            # import ipdb; ipdb.set_trace()
+            for k, v in ckpt.items():
+                if 'context_encoder' in k:
+                    context_encoder_state_dict[k.replace('context_encoder.', '')] = v
+                    
+            
+            self.context_encoder.load_state_dict(context_encoder_state_dict, strict=False)
+            self.context_encoder.eval()
+            for param in self.context_encoder.parameters():
+                param.requires_grad = False
+            print(f"Load context encoder from {ckpt_path} for CrossFlow")
+            
+            
+        else:
+            self.context_encoder = None
+        # self.open_clip, _, self.open_clip_preprocess = open_clip.create_model_and_transforms('ViT-L-16-SigLIP-256', pretrained=None)
+        # self.open_clip_output = Adaptor(input_dim=1024, 
+        #                             tar_dim=config.channels * config.latent_size * config.latent_size
+        #                             )
+        # del self.open_clip.text
+        # del self.open_clip.logit_bias
 
 
 
@@ -273,7 +312,7 @@ class DiT(nn.Module):
         nn.init.constant_(self.x_embedder.proj.bias, 0)
 
         # Initialize label embedding table:
-        nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
+        # nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
 
         # Initialize timestep embedding MLP:
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
@@ -313,8 +352,9 @@ class DiT(nn.Module):
         """
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
-        y = self.y_embedder(null_indicator)    # (N, D)
-        c = t + y                                # (N, D)
+        # y = self.y_embedder(null_indicator)    # (N, D)
+        # c = t + y                                # (N, D)
+        c = t
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
@@ -352,7 +392,15 @@ class DiT(nn.Module):
 
         return [z, mu, log_var]
     
-    def _img_clip(self, image_input):
+    def _text_decoder(self, z, tar_shape):
+        """
+        Decode the latent representation z into text embeddings.
+        z: (N, C, H, W) tensor of latent representations
+        tar_shape: target shape for the output text embeddings
+        """
+        context_token = self.context_encoder(z)
+    
+    def _img_clip(self, image_input): # DO NOT USE THIS
 
         image_latent = self.open_clip.encode_image(image_input)
         image_latent = self.open_clip_output(image_latent)
@@ -364,10 +412,11 @@ class DiT(nn.Module):
             return self._text_encoder(condition_context = x, tar_shape=shape, mask=mask)
         elif text_decoder:
             raise NotImplementedError
-            return self._text_decoder(condition_enbedding = x, tar_shape=shape) # mask is not needed for decoder
+            # return self._text_decoder(condition_enbedding = x, tar_shape=shape) # mask is not needed for decoder
         elif estimator:
             return self._mean_var_estimator(x)
         elif image_clip:
+            raise NotImplementedError
             return self._img_clip(image_input = x) 
         else:
             return self._forward(x = x, t = t, null_indicator=null_indicator)
