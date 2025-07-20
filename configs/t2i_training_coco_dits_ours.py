@@ -119,6 +119,7 @@ def get_config():
         path=''
     )
     
-    config.exp_name = 'dimrxl_2r_ours'  # experiment name
+    config.exp_name = 'dits_ours_kl1e-3'  # experiment name
 
+    config.kl_loss_coeff = 0.001  # coefficient for KL loss, used in training
     return config

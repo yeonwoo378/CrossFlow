@@ -17,6 +17,7 @@ import wandb
 import numpy as np
 import time
 import random
+import torch.nn.functional as F
 
 import libs.autoencoder
 from libs.t5 import T5Embedder
@@ -159,10 +160,12 @@ def train(config):
         img_var = torch.exp(img_logvar) + 1e-6
         text_var = torch.exp(text_logvar) + 1e-6
         
-        z_mu = (img_mu / img_var + text_mu / text_var) / (1 / img_var + 1 / text_var)
+        # z_mu = (img_mu / img_var + text_mu / text_var) / (1 / img_var + 1 / text_var)
+        z_mu  = (img_mu + text_mu) / 2  # use the average of img and text mu
         z_var = 1 / (1 / img_var + 1 / text_var)
         # sample z
-        z = z_mu + torch.exp(z_var / 2) * torch.randn_like(z_mu, device=device)
+        z = z_mu #+ torch.exp(z_var / 2) * torch.randn_like(z_mu, device=device)
+        
         z_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), torch.zeros_like(z_mu), torch.ones_like(z_var))
         img_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), img_mu, img_logvar)
         text_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), text_mu, text_logvar)            
@@ -247,7 +250,10 @@ def train(config):
                 return ode_fm_solver_sample(nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask), _caption
             elif return_clipScore: # currently not used TODO: fix this
                 # Warning: not correct. just placeholder
-                return ode_fm_solver_sample(text_nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask, return_clipScore=return_clipScore, ClipSocre_model=ClipSocre_model, caption=_caption)
+                # return ode_fm_solver_sample(text_nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask, return_clipScore=return_clipScore, ClipSocre_model=ClipSocre_model, caption=_caption)
+                z = ode_fm_solver_sample(text_nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask, decode_image=False)
+                return  ode_fm_solver_sample(img_nnet_ema, _n_samples, sample_steps, z_init=z,  context=_context, token_mask=_token_mask,return_clipScore=return_clipScore, ClipSocre_model=ClipSocre_model, caption=_caption)
+
             else:
                 # reverse sampling ..  text -> z -> image
                 z = ode_fm_solver_sample(text_nnet_ema, _n_samples, sample_steps, context=_context, token_mask=_token_mask, decode_image=False)
@@ -257,11 +263,11 @@ def train(config):
             path = config.sample.path or temp_path
             if accelerator.is_main_process:
                 os.makedirs(path, exist_ok=True)
-            # clip_score_list = utils.sample2dir(accelerator, path, n_samples, config.sample.mini_batch_size, sample_fn, dataset.unpreprocess, return_clipScore=True, ClipSocre_model=ClipSocre_model, config=config)
+            clip_score_list = utils.sample2dir(accelerator, path, n_samples, config.sample.mini_batch_size, sample_fn, dataset.unpreprocess, return_clipScore=True, ClipSocre_model=ClipSocre_model, config=config)
             _fid = 0
             if accelerator.is_main_process:
                 _fid = calculate_fid_given_paths((dataset.fid_stat, path))
-                # _clip_score_list = torch.cat(clip_score_list)
+                _clip_score_list = torch.cat(clip_score_list)
                 logging.info(f'step={train_state.step} fid{n_samples}={_fid}') #  clip_score{len(_clip_score_list)} = {_clip_score_list.mean().item()}')
                 with open(os.path.join(config.workdir, 'eval.log'), 'a') as f:
                     print(f'step={train_state.step} fid{n_samples}={_fid}') # clip_score{len(_clip_score_list)} = {_clip_score_list.mean().item()}', file=f)
