@@ -49,7 +49,7 @@ def train(config):
         os.makedirs(config.sample_dir, exist_ok=True)
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        wandb.init(dir=os.path.abspath(config.workdir), project=f'Bidirectional-flow-MSCOCO', config=config.to_dict(),
+        wandb.init(dir=os.path.abspath(config.workdir), project=f'Bidirectional-Flow-Matching-MSCOCO', config=config.to_dict(),
                    name=config.hparams, job_type='train', mode='online')
         utils.set_logger(log_level='info', fname=os.path.join(config.workdir, 'output.log'))
         logging.info(config)
@@ -160,11 +160,11 @@ def train(config):
         img_var = torch.exp(img_logvar) + 1e-6
         text_var = torch.exp(text_logvar) + 1e-6
         
-        # z_mu = (img_mu / img_var + text_mu / text_var) / (1 / img_var + 1 / text_var)
-        z_mu  = (img_mu + text_mu) / 2  # use the average of img and text mu
+        z_mu = (img_mu / img_var + text_mu / text_var) / (1 / img_var + 1 / text_var)
+        # z_mu  = (img_mu + text_mu) / 2  # use the average of img and text mu
         z_var = 1 / (1 / img_var + 1 / text_var)
         # sample z
-        z = z_mu #+ torch.exp(z_var / 2) * torch.randn_like(z_mu, device=device)
+        z = z_mu + torch.exp(z_var / 2) * torch.randn_like(z_mu, device=device)
         
         z_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), torch.zeros_like(z_mu), torch.ones_like(z_var))
         img_kl_loss = utils.kl_divergence(z_mu, torch.log(z_var), img_mu, img_logvar)
